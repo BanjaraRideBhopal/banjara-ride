@@ -21,21 +21,12 @@ export const helmetOptions = ["Yes", "No"];
 export const modeOfPaymentOptions = [
   "Cash",
   "UPI",
-  "Card",
-  "Both",
-  "Credit",
-  "Bank Transfer"
+  "App Payment"
 ];
 
-export const payViaOptions = [
-  "Cash",
-  "UPI",
-  "Card",
-  "Both",
-  "Credit",
-  "Bank Transfer",
-  "Current Acc",
-  "Paytm Business"
+export const paidToOptions = [
+  "Nazim",
+  "Manish"
 ];
 
 export const refundStatusOptions = [

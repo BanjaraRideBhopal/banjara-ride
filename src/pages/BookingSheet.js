@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import { vehicles } from '../data/vehicles';
 import {
   bookingTypes,
   helmetOptions,
   modeOfPaymentOptions,
-  payViaOptions,
+  paidToOptions,
   refundStatusOptions,
   reasonForDeductionOptions,
   creditToOptions,
@@ -35,15 +36,12 @@ const emptyForm = {
   startKm: '',
   customerName: '',
   mobileNumber: '',
-  repeatUserYearly: false,
-  repeatUserMonthly: false,
   rentAmount: '',
-  oldDeposit: '',
   deliveryCharges: '',
   fullAmountReceived: '',
   cash: '',
+  paidTo: '',
   modeOfPayment: '',
-  payVia: '',
   creditTo: '',
   remarks: '',
 };
@@ -68,20 +66,45 @@ export default function BookingSheet() {
   const [form, setForm] = useState(emptyForm);
   const [bookings, setBookings] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [returningId, setReturningId] = useState(null);
   const [finalForm, setFinalForm] = useState(emptyFinal);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
   const returningBooking = bookings.find(b => b.id === returningId);
 
-  // autoFillAmount = true only when vehicle/bookingType/numDays/numWeeks changes
+  useEffect(() => { loadBookings(); }, []);
+
+  async function loadBookings() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('booking_date', getToday())
+      .order('created_at', { ascending: true });
+
+    if (error) setError('Failed to load bookings: ' + error.message);
+    else setBookings(data || []);
+    setLoading(false);
+  }
+
+  async function lookupCustomer(mobile) {
+    if (mobile.length !== 10) return;
+    const { data } = await supabase
+      .from('customers')
+      .select('name')
+      .eq('mobile', mobile)
+      .single();
+    if (data) setForm(prev => ({ ...prev, customerName: data.name }));
+  }
+
   function recalculate(updated, autoFillAmount = false) {
     const returnDT = calculateReturnDateTime(
-      updated.bookingDate,
-      updated.bookingTime,
-      updated.bookingType,
-      updated.numDays,
-      updated.numWeeks
+      updated.bookingDate, updated.bookingTime,
+      updated.bookingType, updated.numDays, updated.numWeeks
     );
     updated.expectedReturnDateTime = returnDT;
 
@@ -89,74 +112,180 @@ export default function BookingSheet() {
       const v = vehicles.find(veh => veh.type === updated.vehicle);
       if (v) {
         updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0, updated.numDays, updated.numWeeks);
-
         if (autoFillAmount) {
           updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit;
         }
       }
     }
-
     return updated;
   }
 
   function handleChange(e) {
-    const { name, value, type, checked } = e.target;
-    let updated = {
-      ...form,
-      [name]: type === 'checkbox' ? checked : value,
-    };
+    const { name, value } = e.target;
+    let updated = { ...form, [name]: value };
 
     if (name === 'vehicle') {
       const v = vehicles.find(v => v.type === value);
       updated.vehicleNumber = v ? v.registrationNumber : '';
     }
-
     if (name === 'bookingType') {
       updated.numDays = '';
       updated.numWeeks = '';
     }
+    if (name === 'mobileNumber') lookupCustomer(value);
+    // Clear paidTo if cash is cleared
+    if (name === 'cash' && !value) updated.paidTo = '';
+    // Clear creditTo if mode switches away from UPI/App
+    if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
 
     const autoFillAmount = ['vehicle', 'bookingType', 'numDays', 'numWeeks'].includes(name);
     updated = recalculate(updated, autoFillAmount);
     setForm(updated);
   }
 
-  function handleSubmit(e) {
+  function formFromBooking(b) {
+    return {
+      bookingDate: b.booking_date,
+      bookingTime: b.booking_time,
+      bookingType: b.booking_type,
+      numDays: b.num_days || '',
+      numWeeks: b.num_weeks || '',
+      expectedReturnDateTime: b.expected_return,
+      vehicle: b.vehicle,
+      vehicleNumber: b.vehicle_number,
+      helmet: b.helmet || '',
+      startKm: b.start_km || '',
+      customerName: b.customer_name,
+      mobileNumber: b.mobile,
+      rentAmount: b.rent_amount || '',
+      deliveryCharges: b.delivery_charges || '',
+      fullAmountReceived: b.full_amount_received || '',
+      cash: b.cash || '',
+      paidTo: b.paid_to || '',
+      modeOfPayment: b.mode_of_payment || '',
+      creditTo: b.credit_to || '',
+      remarks: b.remarks || '',
+    };
+  }
+
+  function finalFormFromBooking(b) {
+    return {
+      actualReturnDateTime: b.actual_return || '',
+      endKm: b.end_km || '',
+      kmDriven: b.km_driven || '',
+      helmetReturned: b.helmet_returned || '',
+      extraHours: b.extra_hours || '',
+      extraCharge: b.extra_charge || '',
+      rentAmount: b.final_rent || '',
+      deduction: b.deduction || '',
+      reasonForDeduction: b.reason_for_deduction || '',
+      damagedFine: b.damaged_fine || '',
+      refundAmount: b.refund_amount || '',
+      refundStatus: b.refund_status || '',
+      refundBy: b.refund_by || '',
+    };
+  }
+
+  function startEdit(booking) {
+    setEditingId(booking.id);
+    setForm(formFromBooking(booking));
+    setShowForm(true);
+    if (booking.status === 'end') {
+      setReturningId(booking.id);
+      setFinalForm(finalFormFromBooking(booking));
+    } else {
+      setReturningId(null);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!form.customerName || !form.mobileNumber || !form.vehicle) {
       alert('Please fill Customer Name, Mobile Number and Vehicle');
       return;
     }
-    setBookings([...bookings, { ...form, id: Date.now(), status: 'start', final: null }]);
-    setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() });
-    setShowForm(false);
+
+    setSaving(true);
+    setError('');
+
+    const { error: custError } = await supabase
+      .from('customers')
+      .upsert({ mobile: form.mobileNumber, name: form.customerName }, { onConflict: 'mobile' });
+
+    if (custError) {
+      setError('Failed to save customer: ' + custError.message);
+      setSaving(false);
+      return;
+    }
+
+    const payload = {
+      mobile: form.mobileNumber,
+      customer_name: form.customerName,
+      booking_date: form.bookingDate,
+      booking_time: form.bookingTime,
+      booking_type: form.bookingType,
+      num_days: form.numDays,
+      num_weeks: form.numWeeks,
+      expected_return: form.expectedReturnDateTime,
+      vehicle: form.vehicle,
+      vehicle_number: form.vehicleNumber,
+      helmet: form.helmet,
+      start_km: form.startKm,
+      rent_amount: form.rentAmount || 0,
+      delivery_charges: form.deliveryCharges || 0,
+      full_amount_received: form.fullAmountReceived || 0,
+      cash: form.cash || 0,
+      paid_to: form.cash ? form.paidTo : null,
+      mode_of_payment: form.modeOfPayment,
+      credit_to: ['UPI', 'App Payment'].includes(form.modeOfPayment) ? form.creditTo : null,
+      remarks: form.remarks,
+    };
+
+    if (editingId) {
+      const { data, error: updateError } = await supabase
+        .from('bookings')
+        .update(payload)
+        .eq('id', editingId)
+        .select()
+        .single();
+
+      if (updateError) setError('Failed to update booking: ' + updateError.message);
+      else {
+        setBookings(prev => prev.map(b => b.id === editingId ? data : b));
+        setEditingId(null);
+        setShowForm(false);
+        setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() });
+      }
+    } else {
+      const { data, error: insertError } = await supabase
+        .from('bookings')
+        .insert({ id: Date.now(), ...payload, status: 'start' })
+        .select()
+        .single();
+
+      if (insertError) setError('Failed to save booking: ' + insertError.message);
+      else {
+        setBookings(prev => [...prev, data]);
+        setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() });
+        setShowForm(false);
+      }
+    }
+
+    setSaving(false);
   }
 
   function recalculateFinal(updated, booking) {
-    // KM driven
-    updated.kmDriven = calculateKmDriven(booking.startKm, updated.endKm);
-
-    // Base rent from booking type (no late charge)
+    updated.kmDriven = calculateKmDriven(booking.start_km, updated.endKm);
     const v = vehicles.find(veh => veh.type === booking.vehicle);
-    const baseRent = v ? calculateRentAmount(v, booking.bookingType, 0, booking.numDays, booking.numWeeks) : 0;
-
-    // Extra charge from extra hours
+    const baseRent = v ? calculateRentAmount(v, booking.booking_type, 0, booking.num_days, booking.num_weeks) : 0;
     const extraHours = parseFloat(updated.extraHours) || 0;
-    const lateRate = v ? v.lateChargePerHour : 0;
-    updated.extraCharge = extraHours * lateRate;
-
-    // Actual rent = base + extra
+    updated.extraCharge = extraHours * (v ? v.lateChargePerHour : 0);
     updated.rentAmount = baseRent + updated.extraCharge;
-
-    // Refund
     updated.refundAmount = calculateRefundAmount(
-      booking.fullAmountReceived,
-      booking.oldDeposit,
-      booking.deliveryCharges,
-      updated.deduction,
-      updated.rentAmount
+      booking.full_amount_received, 0,
+      booking.delivery_charges, updated.deduction, updated.rentAmount
     );
-
     return updated;
   }
 
@@ -167,25 +296,50 @@ export default function BookingSheet() {
     setFinalForm(updated);
   }
 
-  function handleFinalSubmit(e) {
+  async function handleFinalSubmit(e) {
     e.preventDefault();
-    setBookings(bookings.map(b =>
-      b.id === returningId
-        ? { ...b, status: 'end', final: { ...finalForm } }
-        : b
-    ));
-    setReturningId(null);
-    setFinalForm(emptyFinal);
+    setSaving(true);
+    setError('');
+
+    const { data, error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        status: 'end',
+        actual_return: finalForm.actualReturnDateTime,
+        end_km: finalForm.endKm,
+        km_driven: finalForm.kmDriven,
+        helmet_returned: finalForm.helmetReturned,
+        extra_hours: finalForm.extraHours || 0,
+        extra_charge: finalForm.extraCharge || 0,
+        final_rent: finalForm.rentAmount || 0,
+        deduction: finalForm.deduction || 0,
+        reason_for_deduction: finalForm.reasonForDeduction,
+        damaged_fine: finalForm.damagedFine,
+        refund_amount: finalForm.refundAmount || 0,
+        refund_status: finalForm.refundStatus,
+        refund_by: finalForm.refundBy,
+      })
+      .eq('id', returningId)
+      .select()
+      .single();
+
+    if (updateError) setError('Failed to close booking: ' + updateError.message);
+    else {
+      setBookings(prev => prev.map(b => b.id === returningId ? data : b));
+      setReturningId(null);
+      setFinalForm(emptyFinal);
+    }
+    setSaving(false);
   }
 
   function startReturn(booking) {
     setReturningId(booking.id);
-    setFinalForm({
-      ...emptyFinal,
-      actualReturnDateTime: `${getToday()} ${getCurrentTime12hr()}`,
-    });
+    setFinalForm({ ...emptyFinal, actualReturnDateTime: `${getToday()} ${getCurrentTime12hr()}` });
     setShowForm(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  const showCreditTo = ['UPI', 'App Payment'].includes(form.modeOfPayment);
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -196,15 +350,29 @@ export default function BookingSheet() {
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1a56a0' }}>Banjara Ride</h1>
           <p style={{ color: '#666', fontSize: '14px' }}>Daily Booking Sheet</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setReturningId(null); }} style={btnPrimary}>
+        <button onClick={() => {
+          if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() }); }
+          setShowForm(!showForm);
+          setReturningId(null);
+        }} style={btnPrimary}>
           {showForm ? 'Close Form' : '+ New Booking'}
         </button>
       </div>
 
-      {/* INITIAL BOOKING FORM */}
+      {/* ERROR BANNER */}
+      {error && (
+        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>
+          {error}
+          <button onClick={() => setError('')} style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b', fontWeight: '700' }}>✕</button>
+        </div>
+      )}
+
+      {/* BOOKING FORM (new or edit) */}
       {showForm && (
-        <form onSubmit={handleSubmit} style={formCard}>
-          <h2 style={{ marginBottom: '20px', color: '#1a56a0', fontSize: '18px' }}>New Booking</h2>
+        <form onSubmit={handleSubmit} style={{ ...formCard, borderLeft: editingId ? '4px solid #6366f1' : 'none' }}>
+          <h2 style={{ marginBottom: '20px', color: '#1a56a0', fontSize: '18px' }}>
+            {editingId ? 'Edit Booking' : 'New Booking'}
+          </h2>
 
           <SectionTitle title="Trip Details" />
           <div style={grid(4)}>
@@ -261,23 +429,11 @@ export default function BookingSheet() {
 
           <SectionTitle title="Customer Details" />
           <div style={grid(3)}>
-            <Field label="Customer Name *">
-              <input type="text" name="customerName" value={form.customerName} onChange={handleChange} style={input} placeholder="Full name" />
-            </Field>
             <Field label="Mobile Number *">
               <input type="text" name="mobileNumber" value={form.mobileNumber} onChange={handleChange} style={input} placeholder="10-digit mobile" maxLength={10} />
             </Field>
-            <Field label="Repeat User">
-              <div style={{ display: 'flex', gap: '16px', paddingTop: '8px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
-                  <input type="checkbox" name="repeatUserYearly" checked={form.repeatUserYearly} onChange={handleChange} />
-                  Yearly
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
-                  <input type="checkbox" name="repeatUserMonthly" checked={form.repeatUserMonthly} onChange={handleChange} />
-                  Monthly
-                </label>
-              </div>
+            <Field label="Customer Name *">
+              <input type="text" name="customerName" value={form.customerName} onChange={handleChange} style={input} placeholder="Auto-fills for returning customers" />
             </Field>
           </div>
 
@@ -289,48 +445,51 @@ export default function BookingSheet() {
             <Field label="Security Deposit ₹">
               <input type="number" value={selectedVehicle ? selectedVehicle.securityDeposit : ''} style={{ ...input, background: '#f0f4ff' }} readOnly />
             </Field>
-            <Field label="Old Deposit ₹">
-              <input type="number" name="oldDeposit" value={form.oldDeposit} onChange={handleChange} style={input} placeholder="0" />
-            </Field>
             <Field label="Delivery Charges ₹">
               <input type="number" name="deliveryCharges" value={form.deliveryCharges} onChange={handleChange} style={input} placeholder="0" />
             </Field>
-          </div>
-          <div style={grid(4)}>
             <Field label="Full Amount Received ₹">
               <input type="number" name="fullAmountReceived" value={form.fullAmountReceived} onChange={handleChange} style={input} placeholder="Auto: Rent + Deposit" />
             </Field>
-            <Field label="Cash ₹">
-              <input type="number" name="cash" value={form.cash} onChange={handleChange} style={input} placeholder="0" />
-            </Field>
+          </div>
+          <div style={grid(4)}>
             <Field label="Mode of Payment">
               <select name="modeOfPayment" value={form.modeOfPayment} onChange={handleChange} style={input}>
                 <option value="">Select...</option>
                 {modeOfPaymentOptions.map(m => <option key={m}>{m}</option>)}
               </select>
             </Field>
-            <Field label="Pay Via">
-              <select name="payVia" value={form.payVia} onChange={handleChange} style={input}>
-                <option value="">Select...</option>
-                {payViaOptions.map(p => <option key={p}>{p}</option>)}
-              </select>
+            <Field label="Cash ₹">
+              <input type="number" name="cash" value={form.cash} onChange={handleChange} style={input} placeholder="0" />
             </Field>
+            {form.cash > 0 && (
+              <Field label="Paid To">
+                <select name="paidTo" value={form.paidTo} onChange={handleChange} style={input}>
+                  <option value="">Select...</option>
+                  {paidToOptions.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </Field>
+            )}
+            {showCreditTo && (
+              <Field label="Credit To">
+                <select name="creditTo" value={form.creditTo} onChange={handleChange} style={input}>
+                  <option value="">Select...</option>
+                  {creditToOptions.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </Field>
+            )}
           </div>
-          <div style={grid(3)}>
-            <Field label="Credit To">
-              <select name="creditTo" value={form.creditTo} onChange={handleChange} style={input}>
-                <option value="">Select...</option>
-                {creditToOptions.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </Field>
+          <div style={grid(2)}>
             <Field label="Remarks">
               <input type="text" name="remarks" value={form.remarks} onChange={handleChange} style={input} placeholder="Any additional notes" />
             </Field>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-            <button type="button" onClick={() => setShowForm(false)} style={btnSecondary}>Cancel</button>
-            <button type="submit" style={btnPrimary}>Save Booking</button>
+            <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() }); }} style={btnSecondary}>Cancel</button>
+            <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving...' : editingId ? 'Update Booking' : 'Save Booking'}
+            </button>
           </div>
         </form>
       )}
@@ -340,9 +499,9 @@ export default function BookingSheet() {
         <form onSubmit={handleFinalSubmit} style={{ ...formCard, borderLeft: '4px solid #f59e0b' }}>
           <h2 style={{ marginBottom: '4px', color: '#1a56a0', fontSize: '18px' }}>Close Booking — Return Details</h2>
           <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
-            {returningBooking.customerName} &nbsp;|&nbsp; {returningBooking.vehicle} ({returningBooking.vehicleNumber}) &nbsp;|&nbsp;
-            Booked: {returningBooking.bookingDate} {returningBooking.bookingTime} &nbsp;|&nbsp;
-            Expected Return: {returningBooking.expectedReturnDateTime}
+            {returningBooking.customer_name} &nbsp;|&nbsp; {returningBooking.vehicle} ({returningBooking.vehicle_number}) &nbsp;|&nbsp;
+            Booked: {returningBooking.booking_date} {returningBooking.booking_time} &nbsp;|&nbsp;
+            Expected Return: {returningBooking.expected_return}
           </p>
 
           <SectionTitle title="Return Info" />
@@ -414,7 +573,9 @@ export default function BookingSheet() {
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
             <button type="button" onClick={() => setReturningId(null)} style={btnSecondary}>Cancel</button>
-            <button type="submit" style={{ ...btnPrimary, background: '#059669' }}>Close Booking</button>
+            <button type="submit" disabled={saving} style={{ ...btnPrimary, background: '#059669', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving...' : 'Close Booking'}
+            </button>
           </div>
         </form>
       )}
@@ -424,7 +585,9 @@ export default function BookingSheet() {
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>
           Today's Bookings ({bookings.length})
         </h2>
-        {bookings.length === 0 ? (
+        {loading ? (
+          <p style={{ color: '#999', textAlign: 'center', padding: '40px' }}>Loading...</p>
+        ) : bookings.length === 0 ? (
           <p style={{ color: '#999', textAlign: 'center', padding: '40px' }}>No bookings yet. Click "+ New Booking" to add one.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -433,30 +596,31 @@ export default function BookingSheet() {
                 <tr>
                   <th colSpan={9} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
                   <th colSpan={8} style={{ ...th, background: '#fef9c3', textAlign: 'center' }}>Return Details</th>
-                  <th style={th}></th>
+                  <th colSpan={2} style={{ ...th, textAlign: 'center' }}>Actions</th>
                 </tr>
                 <tr>
                   {['Date', 'Time', 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
                     <th key={h} style={{ ...th, background: '#dbeafe' }}>{h}</th>
                   ))}
-                  {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet Returned'].map(h => (
+                  {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet'].map(h => (
                     <th key={h} style={{ ...th, background: '#fef9c3' }}>{h}</th>
                   ))}
-                  <th style={th}>Action</th>
+                  <th style={th}>Edit</th>
+                  <th style={th}>Close</th>
                 </tr>
               </thead>
               <tbody>
                 {bookings.map((b, i) => (
                   <tr key={b.id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
-                    <td style={tdStyle}>{b.bookingDate}</td>
-                    <td style={tdStyle}>{b.bookingTime}</td>
-                    <td style={tdStyle}>{b.customerName}</td>
-                    <td style={tdStyle}>{b.mobileNumber}</td>
-                    <td style={tdStyle}>{b.vehicle} — {b.vehicleNumber}</td>
-                    <td style={tdStyle}>{b.bookingType}{b.numDays ? ` (${b.numDays}d)` : ''}{b.numWeeks ? ` (${b.numWeeks}w)` : ''}</td>
-                    <td style={tdStyle}>{b.expectedReturnDateTime}</td>
-                    <td style={tdStyle}>{b.startKm || '—'}</td>
-                    <td style={tdStyle}>₹{b.rentAmount}</td>
+                    <td style={tdStyle}>{b.booking_date}</td>
+                    <td style={tdStyle}>{b.booking_time}</td>
+                    <td style={tdStyle}>{b.customer_name}</td>
+                    <td style={tdStyle}>{b.mobile}</td>
+                    <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>
+                    <td style={tdStyle}>{b.booking_type}{b.num_days ? ` (${b.num_days}d)` : ''}{b.num_weeks ? ` (${b.num_weeks}w)` : ''}</td>
+                    <td style={tdStyle}>{b.expected_return}</td>
+                    <td style={tdStyle}>{b.start_km || '—'}</td>
+                    <td style={tdStyle}>₹{b.rent_amount}</td>
                     <td style={tdStyle}>
                       <span style={{
                         padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
@@ -466,13 +630,21 @@ export default function BookingSheet() {
                         {b.status === 'start' ? 'Start' : 'End'}
                       </span>
                     </td>
-                    <td style={tdStyle}>{b.final?.actualReturnDateTime || '—'}</td>
-                    <td style={tdStyle}>{b.final?.endKm || '—'}</td>
-                    <td style={tdStyle}>{b.final?.kmDriven ? `${b.final.kmDriven} km` : '—'}</td>
-                    <td style={tdStyle}>{b.final?.extraHours ? `${b.final.extraHours} hr` : '—'}</td>
-                    <td style={tdStyle}>{b.final ? `₹${b.final.rentAmount}` : '—'}</td>
-                    <td style={tdStyle}>{b.final ? `₹${b.final.refundAmount}` : '—'}</td>
-                    <td style={tdStyle}>{b.final?.helmetReturned || '—'}</td>
+                    <td style={tdStyle}>{b.actual_return || '—'}</td>
+                    <td style={tdStyle}>{b.end_km || '—'}</td>
+                    <td style={tdStyle}>{b.km_driven ? `${b.km_driven} km` : '—'}</td>
+                    <td style={tdStyle}>{b.extra_hours ? `${b.extra_hours} hr` : '—'}</td>
+                    <td style={tdStyle}>{b.final_rent ? `₹${b.final_rent}` : '—'}</td>
+                    <td style={tdStyle}>{b.refund_amount ? `₹${b.refund_amount}` : '—'}</td>
+                    <td style={tdStyle}>{b.helmet_returned || '—'}</td>
+                    <td style={tdStyle}>
+                      <button
+                        onClick={() => startEdit(b)}
+                        style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px' }}
+                      >
+                        Edit
+                      </button>
+                    </td>
                     <td style={tdStyle}>
                       {b.status === 'start' && (
                         <button
