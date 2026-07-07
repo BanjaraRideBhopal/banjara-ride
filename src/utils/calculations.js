@@ -53,7 +53,10 @@ export function calculateReturnDateTime(date, time12, bookingType, numDays, numW
 
   const returnDate = new Date(start.getTime() + hoursToAdd * 60 * 60 * 1000);
 
-  const retDate = returnDate.toISOString().split('T')[0];
+  const year = returnDate.getFullYear();
+  const month = (returnDate.getMonth() + 1).toString().padStart(2, '0');
+  const day = returnDate.getDate().toString().padStart(2, '0');
+  const retDate = `${year}-${month}-${day}`;
   const retTime = to12hr(returnDate.toTimeString().slice(0, 5));
 
   return `${retDate} ${retTime}`;

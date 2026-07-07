@@ -369,7 +369,7 @@ export default function BookingSheet() {
 
       {/* BOOKING FORM (new or edit) */}
       {showForm && (
-        <form onSubmit={handleSubmit} style={{ ...formCard, borderLeft: editingId ? '4px solid #6366f1' : 'none' }}>
+        <form onSubmit={handleSubmit} autoComplete="off" style={{ ...formCard, borderLeft: editingId ? '4px solid #6366f1' : 'none' }}>
           <h2 style={{ marginBottom: '20px', color: '#1a56a0', fontSize: '18px' }}>
             {editingId ? 'Edit Booking' : 'New Booking'}
           </h2>
