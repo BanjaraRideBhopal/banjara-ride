@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { vehicles } from '../data/vehicles';
 import {
@@ -84,11 +84,54 @@ export default function BookingSheet() {
   const [filterDate, setFilterDate] = useState(getToday());
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const [approachingReturns, setApproachingReturns] = useState([]);
+
+  const bookingsRef = useRef([]);
+  const notifiedIds = useRef(new Set());
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
   const returningBooking = bookings.find(b => b.id === returningId);
 
-  useEffect(() => { loadBookings(getToday()); }, []);
+  useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
+
+  useEffect(() => {
+    loadBookings(getToday());
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    const interval = setInterval(checkApproachingReturns, 60000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function parseReturnDT(str) {
+    if (!str) return null;
+    const parts = str.split(' ');
+    if (parts.length < 3) return null;
+    let [h, m] = parts[1].split(':').map(Number);
+    if (parts[2] === 'AM' && h === 12) h = 0;
+    if (parts[2] === 'PM' && h !== 12) h += 12;
+    return new Date(`${parts[0]}T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`);
+  }
+
+  function checkApproachingReturns() {
+    const now = new Date();
+    const upcoming = bookingsRef.current.filter(b => {
+      if (b.status !== 'start' || !b.expected_return) return false;
+      const rt = parseReturnDT(b.expected_return);
+      if (!rt) return false;
+      const diff = (rt - now) / (1000 * 60);
+      return diff > 0 && diff <= 15;
+    });
+    setApproachingReturns(upcoming);
+    upcoming.forEach(b => {
+      if (!notifiedIds.current.has(b.id) && Notification.permission === 'granted') {
+        notifiedIds.current.add(b.id);
+        new Notification('⏰ Vehicle Return Due Soon!', {
+          body: `${b.customer_name} — ${b.vehicle} (${b.vehicle_number}) due at ${b.expected_return}`,
+        });
+      }
+    });
+  }
 
   async function loadBookings(date) {
     setLoading(true);
@@ -99,7 +142,11 @@ export default function BookingSheet() {
       .order('created_at', { ascending: true });
 
     if (error) setError('Failed to load bookings: ' + error.message);
-    else setBookings(data || []);
+    else {
+      setBookings(data || []);
+      bookingsRef.current = data || [];
+      checkApproachingReturns();
+    }
     setLoading(false);
   }
 
@@ -669,6 +716,19 @@ export default function BookingSheet() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* APPROACHING RETURNS ALERT */}
+      {approachingReturns.length > 0 && (
+        <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: '10px', padding: '14px 20px', marginBottom: '16px' }}>
+          <div style={{ fontWeight: '700', color: '#92400e', marginBottom: '8px', fontSize: '14px' }}>⏰ Return Due in 15 Minutes</div>
+          {approachingReturns.map(b => (
+            <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #fde68a', fontSize: '13px', color: '#78350f' }}>
+              <span>{b.customer_name} &nbsp;·&nbsp; {b.vehicle} ({b.vehicle_number}) &nbsp;·&nbsp; Due: {b.expected_return}</span>
+              <button onClick={() => startReturn(b)} style={{ ...btnPrimary, background: '#f59e0b', padding: '4px 12px', fontSize: '12px', marginLeft: '12px', whiteSpace: 'nowrap' }}>Close Now</button>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* FILTER & SEARCH BAR */}
