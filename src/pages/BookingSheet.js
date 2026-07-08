@@ -547,34 +547,45 @@ export default function BookingSheet() {
           </div>
 
           <SectionTitle title="Final Payment" />
-          <div style={grid(4)}>
-            <Field label="Extra Hours">
-              <input type="number" name="extraHours" value={finalForm.extraHours} onChange={handleFinalChange} style={input} placeholder="0" min="0" step="1" />
-            </Field>
-            <Field label="Extra Charge ₹ (@ ₹50/hr)">
-              <input type="number" value={finalForm.extraCharge} style={{ ...input, background: '#fff7ed' }} readOnly />
-            </Field>
-            <Field label="Actual Rent ₹">
-              <input type="number" value={finalForm.rentAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
-            </Field>
-            <Field label="Deduction ₹">
-              <input type="number" name="deduction" value={finalForm.deduction} onChange={handleFinalChange} style={input} placeholder="0" />
-            </Field>
-          </div>
-          <div style={grid(4)}>
-            <Field label="Reason For Deduction">
-              <select name="reasonForDeduction" value={finalForm.reasonForDeduction} onChange={handleFinalChange} style={input}>
-                <option value="">Select...</option>
-                {reasonForDeductionOptions.map(r => <option key={r}>{r}</option>)}
-              </select>
-            </Field>
-            <Field label="Damaged & Fine">
-              <input type="text" name="damagedFine" value={finalForm.damagedFine} onChange={handleFinalChange} style={input} placeholder="Describe + amount" />
-            </Field>
-            <Field label="Refund Amount ₹">
-              <input type="number" value={finalForm.refundAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
-            </Field>
-          </div>
+          {(() => {
+            const returningVehicle = vehicles.find(v => v.type === returningBooking.vehicle);
+            const lateCharge = returningVehicle ? returningVehicle.lateChargePerHour : 0;
+            const showDamageField = ['Damage', 'Penalty'].includes(finalForm.reasonForDeduction);
+            return (
+              <>
+                <div style={grid(4)}>
+                  <Field label="Extra Hours">
+                    <input type="number" name="extraHours" value={finalForm.extraHours} onChange={handleFinalChange} style={input} placeholder="0" min="0" step="1" />
+                  </Field>
+                  <Field label={`Extra Charge ₹ (@ ₹${lateCharge}/hr)`}>
+                    <input type="number" value={finalForm.extraCharge} style={{ ...input, background: '#fff7ed' }} readOnly />
+                  </Field>
+                  <Field label="Actual Rent ₹">
+                    <input type="number" value={finalForm.rentAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
+                  </Field>
+                  <Field label="Deduction ₹">
+                    <input type="number" name="deduction" value={finalForm.deduction} onChange={handleFinalChange} style={input} placeholder="0" />
+                  </Field>
+                </div>
+                <div style={grid(4)}>
+                  <Field label="Reason For Deduction">
+                    <select name="reasonForDeduction" value={finalForm.reasonForDeduction} onChange={handleFinalChange} style={input}>
+                      <option value="">Select...</option>
+                      {reasonForDeductionOptions.map(r => <option key={r}>{r}</option>)}
+                    </select>
+                  </Field>
+                  {showDamageField && (
+                    <Field label="Damage / Fine Description">
+                      <textarea name="damagedFine" value={finalForm.damagedFine} onChange={handleFinalChange} style={{ ...input, resize: 'vertical', minHeight: '38px' }} placeholder="Describe damage or penalty..." />
+                    </Field>
+                  )}
+                  <Field label="Refund Amount ₹">
+                    <input type="number" value={finalForm.refundAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
+                  </Field>
+                </div>
+              </>
+            );
+          })()}
           <div style={grid(3)}>
             <Field label="Refund Status">
               <select name="refundStatus" value={finalForm.refundStatus} onChange={handleFinalChange} style={input}>
