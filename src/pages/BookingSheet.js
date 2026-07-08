@@ -407,9 +407,9 @@ export default function BookingSheet() {
               })()}
             </Field>
             <Field label="Booking Duration *">
-              <select name="bookingType" value={form.bookingType} onChange={handleChange} style={input}>
-                <option value="">Select...</option>
-                {(selectedVehicle ? bookingTypes.filter(bt => selectedVehicle.rates[bt] != null) : bookingTypes).map(b => <option key={b}>{b}</option>)}
+              <select name="bookingType" value={form.bookingType} onChange={handleChange} style={input} disabled={!selectedVehicle}>
+                <option value="">{selectedVehicle ? 'Select...' : 'Select vehicle first'}</option>
+                {selectedVehicle && bookingTypes.filter(bt => selectedVehicle.rates[bt] != null).map(b => <option key={b}>{b}</option>)}
               </select>
             </Field>
             <Field label="Centre *">
@@ -530,7 +530,33 @@ export default function BookingSheet() {
           <SectionTitle title="Return Info" />
           <div style={grid(3)}>
             <Field label="Actual Return Date & Time">
-              <input type="text" name="actualReturnDateTime" value={finalForm.actualReturnDateTime} onChange={handleFinalChange} style={input} placeholder="YYYY-MM-DD HH:MM AM/PM" />
+              {(() => {
+                const parts = (finalForm.actualReturnDateTime || '').split(' ');
+                const retDate = parts[0] || getToday();
+                const { hour, minute, period } = parseTime12hr(parts.length >= 3 ? `${parts[1]} ${parts[2]}` : '');
+                const setRetPart = (key, val) => {
+                  const cur = (finalForm.actualReturnDateTime || '').split(' ');
+                  const d = cur[0] || getToday();
+                  const { hour: h, minute: m, period: p } = parseTime12hr(cur.length >= 3 ? `${cur[1]} ${cur[2]}` : '');
+                  const next = { date: d, hour: h, minute: m, period: p, [key]: val };
+                  handleFinalChange({ target: { name: 'actualReturnDateTime', value: `${next.date} ${next.hour}:${next.minute} ${next.period}` } });
+                };
+                return (
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    <input type="date" value={retDate} onChange={e => setRetPart('date', e.target.value)} style={{ ...input, flex: 2, minWidth: '120px' }} />
+                    <select value={hour} onChange={e => setRetPart('hour', e.target.value)} style={{ ...input, flex: 1, padding: '8px 4px' }}>
+                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map(h => <option key={h}>{h}</option>)}
+                    </select>
+                    <select value={minute} onChange={e => setRetPart('minute', e.target.value)} style={{ ...input, flex: 1, padding: '8px 4px' }}>
+                      {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map(m => <option key={m}>{m}</option>)}
+                    </select>
+                    <select value={period} onChange={e => setRetPart('period', e.target.value)} style={{ ...input, flex: 1, padding: '8px 4px' }}>
+                      <option>AM</option>
+                      <option>PM</option>
+                    </select>
+                  </div>
+                );
+              })()}
             </Field>
             <Field label="Helmet Returned">
               <select name="helmetReturned" value={finalForm.helmetReturned} onChange={handleFinalChange} style={input}>
