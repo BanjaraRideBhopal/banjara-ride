@@ -423,10 +423,10 @@ export default function BookingSheet() {
   const showCreditTo = ['UPI', 'App Payment'].includes(form.modeOfPayment);
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="br-page">
 
       {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div className="br-header">
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1a56a0' }}>Banjara Ride</h1>
           <p style={{ color: '#666', fontSize: '14px' }}>Daily Booking Sheet</p>
@@ -450,13 +450,13 @@ export default function BookingSheet() {
 
       {/* BOOKING FORM (new or edit) */}
       {showForm && (
-        <form onSubmit={handleSubmit} autoComplete="off" style={{ ...formCard, borderLeft: editingId ? '4px solid #6366f1' : 'none' }}>
+        <form onSubmit={handleSubmit} autoComplete="off" className="br-form-card" style={{ borderLeft: editingId ? '4px solid #6366f1' : 'none' }}>
           <h2 style={{ marginBottom: '20px', color: '#1a56a0', fontSize: '18px' }}>
             {editingId ? 'Edit Booking' : 'New Booking'}
           </h2>
 
           <SectionTitle title="Trip Details" />
-          <div style={grid(4)}>
+          <div className="br-grid-4">
             <Field label="Booking Date *">
               <input type="date" name="bookingDate" value={form.bookingDate} onChange={handleChange} style={input} />
             </Field>
@@ -497,7 +497,7 @@ export default function BookingSheet() {
               </select>
             </Field>
           </div>
-          <div style={grid(3)}>
+          <div className="br-grid-3">
             <Field label="Expected Return Date & Time">
               <input type="text" value={form.expectedReturnDateTime} style={{ ...input, background: '#f0f4ff' }} readOnly />
             </Field>
@@ -510,7 +510,7 @@ export default function BookingSheet() {
           </div>
 
           <SectionTitle title="Vehicle Details" />
-          <div style={grid(3)}>
+          <div className="br-grid-3">
             <Field label="Vehicle *">
               <select name="vehicle" value={form.vehicle} onChange={handleChange} style={input}>
                 <option value="">Select...</option>
@@ -529,7 +529,7 @@ export default function BookingSheet() {
           </div>
 
           <SectionTitle title="Customer Details" />
-          <div style={grid(3)}>
+          <div className="br-grid-3">
             <Field label="Mobile Number *">
               <input type="text" name="mobileNumber" value={form.mobileNumber} onChange={handleChange} style={input} placeholder="10-digit mobile" maxLength={10} />
             </Field>
@@ -539,7 +539,7 @@ export default function BookingSheet() {
           </div>
 
           <SectionTitle title="Payment Details" />
-          <div style={grid(4)}>
+          <div className="br-grid-4">
             <Field label="Estimated Rent ₹">
               <input type="number" value={form.rentAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
             </Field>
@@ -553,7 +553,7 @@ export default function BookingSheet() {
               <input type="number" name="fullAmountReceived" value={form.fullAmountReceived} onChange={handleChange} style={input} placeholder="Auto: Rent + Deposit" />
             </Field>
           </div>
-          <div style={grid(4)}>
+          <div className="br-grid-4">
             <Field label="Mode of Payment">
               <select name="modeOfPayment" value={form.modeOfPayment} onChange={handleChange} style={input}>
                 <option value="">Select...</option>
@@ -580,7 +580,7 @@ export default function BookingSheet() {
               </Field>
             )}
           </div>
-          <div style={grid(2)}>
+          <div className="br-grid-2">
             <Field label="Remarks">
               <input type="text" name="remarks" value={form.remarks} onChange={handleChange} style={input} placeholder="Any additional notes" />
             </Field>
@@ -597,7 +597,7 @@ export default function BookingSheet() {
 
       {/* FINAL / RETURN FORM */}
       {returningBooking && (
-        <form onSubmit={handleFinalSubmit} style={{ ...formCard, borderLeft: '4px solid #f59e0b' }}>
+        <form onSubmit={handleFinalSubmit} className="br-form-card" style={{ borderLeft: '4px solid #f59e0b' }}>
           <h2 style={{ marginBottom: '4px', color: '#1a56a0', fontSize: '18px' }}>Close Booking — Return Details</h2>
           <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
             {returningBooking.customer_name} &nbsp;|&nbsp; {returningBooking.vehicle} ({returningBooking.vehicle_number}) &nbsp;|&nbsp;
@@ -606,7 +606,7 @@ export default function BookingSheet() {
           </p>
 
           <SectionTitle title="Return Info" />
-          <div style={grid(3)}>
+          <div className="br-grid-3">
             <Field label="Actual Return Date & Time">
               {(() => {
                 const parts = (finalForm.actualReturnDateTime || '').split(' ');
@@ -645,7 +645,7 @@ export default function BookingSheet() {
           </div>
 
           <SectionTitle title="Vehicle Return" />
-          <div style={grid(3)}>
+          <div className="br-grid-3">
             <Field label="End KM">
               <input type="number" name="endKm" value={finalForm.endKm} onChange={handleFinalChange} style={input} placeholder="Odometer at return" />
             </Field>
@@ -661,7 +661,7 @@ export default function BookingSheet() {
             const showDamageField = ['Damage', 'Penalty'].includes(finalForm.reasonForDeduction);
             return (
               <>
-                <div style={grid(4)}>
+                <div className="br-grid-4">
                   <Field label="Extra Hours">
                     <input type="number" name="extraHours" value={finalForm.extraHours} onChange={handleFinalChange} style={input} placeholder="0" min="0" step="1" />
                   </Field>
@@ -675,7 +675,7 @@ export default function BookingSheet() {
                     <input type="number" name="deduction" value={finalForm.deduction} onChange={handleFinalChange} style={input} placeholder="0" />
                   </Field>
                 </div>
-                <div style={grid(4)}>
+                <div className="br-grid-4">
                   <Field label="Reason For Deduction">
                     <select name="reasonForDeduction" value={finalForm.reasonForDeduction} onChange={handleFinalChange} style={input}>
                       <option value="">Select...</option>
@@ -694,7 +694,7 @@ export default function BookingSheet() {
               </>
             );
           })()}
-          <div style={grid(3)}>
+          <div className="br-grid-3">
             <Field label="Refund Status">
               <select name="refundStatus" value={finalForm.refundStatus} onChange={handleFinalChange} style={input}>
                 <option value="">Select...</option>
@@ -732,7 +732,7 @@ export default function BookingSheet() {
       )}
 
       {/* FILTER & SEARCH BAR */}
-      <div style={{ background: 'white', borderRadius: '12px', padding: '16px 24px', marginBottom: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'flex', gap: '24px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <div className="br-filter">
         {/* Date Filter */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>View Date</label>
@@ -745,7 +745,7 @@ export default function BookingSheet() {
         </div>
 
         {/* Divider */}
-        <div style={{ width: '1px', background: '#e5e7eb', alignSelf: 'stretch', margin: '0 4px' }} />
+        <div className="br-filter-divider" style={{ width: '1px', background: '#e5e7eb', alignSelf: 'stretch', margin: '0 4px' }} />
 
         {/* Search */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '240px' }}>
@@ -766,7 +766,7 @@ export default function BookingSheet() {
       </div>
 
       {/* BOOKINGS TABLE */}
-      <div style={formCard}>
+      <div className="br-form-card">
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>
           {isSearchMode
             ? `Search Results for "${searchQuery}" (${bookings.length})`
@@ -779,77 +779,113 @@ export default function BookingSheet() {
         ) : bookings.length === 0 ? (
           <p style={{ color: '#999', textAlign: 'center', padding: '40px' }}>No bookings yet. Click "+ New Booking" to add one.</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr>
-                  <th colSpan={10} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
-                  <th colSpan={8} style={{ ...th, background: '#fef9c3', textAlign: 'center' }}>Return Details</th>
-                  <th colSpan={2} style={{ ...th, textAlign: 'center' }}>Actions</th>
-                </tr>
-                <tr>
-                  {['Date', 'Time', 'Centre', 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
-                    <th key={h} style={{ ...th, background: '#dbeafe' }}>{h}</th>
-                  ))}
-                  {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet'].map(h => (
-                    <th key={h} style={{ ...th, background: '#fef9c3' }}>{h}</th>
-                  ))}
-                  <th style={th}>Edit</th>
-                  <th style={th}>Close</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map((b, i) => (
-                  <tr key={b.id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
-                    <td style={tdStyle}>{b.booking_date}</td>
-                    <td style={tdStyle}>{b.booking_time}</td>
-                    <td style={tdStyle}>{b.centre || '—'}</td>
-                    <td style={tdStyle}>{b.customer_name}</td>
-                    <td style={tdStyle}>{b.mobile}</td>
-                    <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>
-                    <td style={tdStyle}>{b.booking_type}</td>
-                    <td style={tdStyle}>{b.expected_return}</td>
-                    <td style={tdStyle}>{b.start_km || '—'}</td>
-                    <td style={tdStyle}>₹{b.rent_amount}</td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
-                        background: b.status === 'start' ? '#fef3c7' : '#d1fae5',
-                        color: b.status === 'start' ? '#92400e' : '#065f46'
-                      }}>
-                        {b.status === 'start' ? 'Start' : 'End'}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>{b.actual_return || '—'}</td>
-                    <td style={tdStyle}>{b.end_km || '—'}</td>
-                    <td style={tdStyle}>{b.km_driven ? `${b.km_driven} km` : '—'}</td>
-                    <td style={tdStyle}>{b.extra_hours ? `${b.extra_hours} hr` : '—'}</td>
-                    <td style={tdStyle}>{b.final_rent ? `₹${b.final_rent}` : '—'}</td>
-                    <td style={tdStyle}>{b.refund_amount ? `₹${b.refund_amount}` : '—'}</td>
-                    <td style={tdStyle}>{b.helmet_returned || '—'}</td>
-                    <td style={tdStyle}>
-                      <button
-                        onClick={() => startEdit(b)}
-                        style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px' }}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                    <td style={tdStyle}>
-                      {b.status === 'start' && (
-                        <button
-                          onClick={() => startReturn(b)}
-                          style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', background: '#f59e0b' }}
-                        >
-                          Close
-                        </button>
-                      )}
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="desktop-table">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr>
+                    <th colSpan={10} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
+                    <th colSpan={8} style={{ ...th, background: '#fef9c3', textAlign: 'center' }}>Return Details</th>
+                    <th colSpan={2} style={{ ...th, textAlign: 'center' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <tr>
+                    {['Date', 'Time', 'Centre', 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
+                      <th key={h} style={{ ...th, background: '#dbeafe' }}>{h}</th>
+                    ))}
+                    {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet'].map(h => (
+                      <th key={h} style={{ ...th, background: '#fef9c3' }}>{h}</th>
+                    ))}
+                    <th style={th}>Edit</th>
+                    <th style={th}>Close</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map((b, i) => (
+                    <tr key={b.id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
+                      <td style={tdStyle}>{b.booking_date}</td>
+                      <td style={tdStyle}>{b.booking_time}</td>
+                      <td style={tdStyle}>{b.centre || '—'}</td>
+                      <td style={tdStyle}>{b.customer_name}</td>
+                      <td style={tdStyle}>{b.mobile}</td>
+                      <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>
+                      <td style={tdStyle}>{b.booking_type}</td>
+                      <td style={tdStyle}>{b.expected_return}</td>
+                      <td style={tdStyle}>{b.start_km || '—'}</td>
+                      <td style={tdStyle}>₹{b.rent_amount}</td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+                          background: b.status === 'start' ? '#fef3c7' : '#d1fae5',
+                          color: b.status === 'start' ? '#92400e' : '#065f46'
+                        }}>
+                          {b.status === 'start' ? 'Start' : 'End'}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>{b.actual_return || '—'}</td>
+                      <td style={tdStyle}>{b.end_km || '—'}</td>
+                      <td style={tdStyle}>{b.km_driven ? `${b.km_driven} km` : '—'}</td>
+                      <td style={tdStyle}>{b.extra_hours ? `${b.extra_hours} hr` : '—'}</td>
+                      <td style={tdStyle}>{b.final_rent ? `₹${b.final_rent}` : '—'}</td>
+                      <td style={tdStyle}>{b.refund_amount ? `₹${b.refund_amount}` : '—'}</td>
+                      <td style={tdStyle}>{b.helmet_returned || '—'}</td>
+                      <td style={tdStyle}>
+                        <button onClick={() => startEdit(b)} style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px' }}>Edit</button>
+                      </td>
+                      <td style={tdStyle}>
+                        {b.status === 'start' && (
+                          <button onClick={() => startReturn(b)} style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', background: '#f59e0b' }}>Close</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="mobile-cards">
+              {bookings.map(b => (
+                <div key={b.id} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px', marginBottom: '10px', background: 'white', borderLeft: b.status === 'start' ? '4px solid #f59e0b' : '4px solid #059669' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '15px', color: '#1a56a0' }}>{b.customer_name}</div>
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{b.mobile}</div>
+                    </div>
+                    <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: b.status === 'start' ? '#fef3c7' : '#d1fae5', color: b.status === 'start' ? '#92400e' : '#065f46', whiteSpace: 'nowrap' }}>
+                      {b.status === 'start' ? 'Active' : 'Closed'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#333', marginBottom: '4px' }}>
+                    <strong>{b.vehicle}</strong> &nbsp;·&nbsp; {b.vehicle_number}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#555', marginBottom: '4px' }}>
+                    {b.booking_type} &nbsp;·&nbsp; {b.centre || '—'} &nbsp;·&nbsp; {b.booking_date} {b.booking_time}
+                  </div>
+                  {b.status === 'start' ? (
+                    <div style={{ fontSize: '12px', color: '#92400e', fontWeight: '600', marginBottom: '4px' }}>
+                      Return by: {b.expected_return}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#555', marginBottom: '4px' }}>
+                      Returned: {b.actual_return || '—'}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '12px', color: '#444', marginBottom: '10px' }}>
+                    Rent ₹{b.rent_amount} &nbsp;·&nbsp; Full ₹{b.full_amount_received}
+                    {b.status === 'end' && b.refund_amount ? ` · Refund ₹${b.refund_amount}` : ''}
+                    {b.km_driven ? ` · ${b.km_driven} km` : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => startEdit(b)} style={{ ...btnSecondary, padding: '8px 0', fontSize: '13px', flex: 1 }}>Edit</button>
+                    {b.status === 'start' && (
+                      <button onClick={() => startReturn(b)} style={{ ...btnPrimary, padding: '8px 0', fontSize: '13px', background: '#f59e0b', flex: 1 }}>Close Trip</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -876,7 +912,5 @@ function Field({ label, children }) {
 const input = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', width: '100%', outline: 'none' };
 const tdStyle = { padding: '10px 12px', whiteSpace: 'nowrap', color: '#333' };
 const th = { padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#1a56a0', whiteSpace: 'nowrap', borderBottom: '2px solid #1a56a0' };
-const formCard = { background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' };
 const btnPrimary = { background: '#1a56a0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' };
 const btnSecondary = { padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', cursor: 'pointer', fontSize: '14px' };
-function grid(cols) { return { display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '16px', marginBottom: '16px' }; }

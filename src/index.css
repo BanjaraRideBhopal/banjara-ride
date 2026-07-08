@@ -8,3 +8,68 @@ body {
   font-family: sans-serif;
   background: #f5f5f5;
 }
+
+/* ── Page layout ─────────────────────────────────── */
+.br-page { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+.br-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.br-form-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.br-filter {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ── Responsive grids ────────────────────────────── */
+.br-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px; }
+.br-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.br-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+
+/* ── Desktop/Mobile visibility ───────────────────── */
+.desktop-table { display: block; overflow-x: auto; }
+.mobile-cards  { display: none; }
+
+/* ── Tablet (≤ 768px) ────────────────────────────── */
+@media (max-width: 768px) {
+  .br-page { padding: 16px; }
+
+  .br-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .br-header > button { align-self: stretch; text-align: center; }
+
+  .br-form-card { padding: 16px; }
+
+  .br-filter { flex-direction: column; gap: 14px; padding: 16px; }
+  .br-filter-divider { display: none; }
+
+  .br-grid-3,
+  .br-grid-4 { grid-template-columns: repeat(2, 1fr); }
+
+  .desktop-table { display: none; }
+  .mobile-cards  { display: block; }
+}
+
+/* ── Phone (≤ 480px) ─────────────────────────────── */
+@media (max-width: 480px) {
+  .br-grid-2,
+  .br-grid-3,
+  .br-grid-4 { grid-template-columns: 1fr; }
+}
