@@ -20,7 +20,11 @@ import {
 } from '../utils/calculations';
 
 function getToday() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dd = d.getDate().toString().padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 const emptyForm = {
