@@ -27,8 +27,6 @@ const emptyForm = {
   bookingDate: getToday(),
   bookingTime: getCurrentTime12hr(),
   bookingType: '',
-  numDays: '',
-  numWeeks: '',
   expectedReturnDateTime: '',
   vehicle: '',
   vehicleNumber: '',
@@ -103,15 +101,14 @@ export default function BookingSheet() {
 
   function recalculate(updated, autoFillAmount = false) {
     const returnDT = calculateReturnDateTime(
-      updated.bookingDate, updated.bookingTime,
-      updated.bookingType, updated.numDays, updated.numWeeks
+      updated.bookingDate, updated.bookingTime, updated.bookingType
     );
     updated.expectedReturnDateTime = returnDT;
 
     if (updated.vehicle && updated.bookingType) {
       const v = vehicles.find(veh => veh.type === updated.vehicle);
       if (v) {
-        updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0, updated.numDays, updated.numWeeks);
+        updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
         if (autoFillAmount) {
           updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit;
         }
@@ -126,19 +123,16 @@ export default function BookingSheet() {
 
     if (name === 'vehicle') {
       const v = vehicles.find(v => v.type === value);
-      updated.vehicleNumber = v ? v.registrationNumber : '';
-    }
-    if (name === 'bookingType') {
-      updated.numDays = '';
-      updated.numWeeks = '';
+      updated.vehicleNumber = v && v.registrations.length === 1 ? v.registrations[0] : '';
+      updated.bookingType = '';
+      updated.rentAmount = '';
+      updated.fullAmountReceived = '';
     }
     if (name === 'mobileNumber') lookupCustomer(value);
-    // Clear paidTo if cash is cleared
     if (name === 'cash' && !value) updated.paidTo = '';
-    // Clear creditTo if mode switches away from UPI/App
     if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
 
-    const autoFillAmount = ['vehicle', 'bookingType', 'numDays', 'numWeeks'].includes(name);
+    const autoFillAmount = ['vehicle', 'bookingType'].includes(name);
     updated = recalculate(updated, autoFillAmount);
     setForm(updated);
   }
@@ -148,8 +142,6 @@ export default function BookingSheet() {
       bookingDate: b.booking_date,
       bookingTime: b.booking_time,
       bookingType: b.booking_type,
-      numDays: b.num_days || '',
-      numWeeks: b.num_weeks || '',
       expectedReturnDateTime: b.expected_return,
       vehicle: b.vehicle,
       vehicleNumber: b.vehicle_number,
@@ -225,8 +217,6 @@ export default function BookingSheet() {
       booking_date: form.bookingDate,
       booking_time: form.bookingTime,
       booking_type: form.bookingType,
-      num_days: form.numDays,
-      num_weeks: form.numWeeks,
       expected_return: form.expectedReturnDateTime,
       vehicle: form.vehicle,
       vehicle_number: form.vehicleNumber,
@@ -278,7 +268,7 @@ export default function BookingSheet() {
   function recalculateFinal(updated, booking) {
     updated.kmDriven = calculateKmDriven(booking.start_km, updated.endKm);
     const v = vehicles.find(veh => veh.type === booking.vehicle);
-    const baseRent = v ? calculateRentAmount(v, booking.booking_type, 0, booking.num_days, booking.num_weeks) : 0;
+    const baseRent = v ? calculateRentAmount(v, booking.booking_type, 0) : 0;
     const extraHours = parseFloat(updated.extraHours) || 0;
     updated.extraCharge = extraHours * (v ? v.lateChargePerHour : 0);
     updated.rentAmount = baseRent + updated.extraCharge;
@@ -385,19 +375,9 @@ export default function BookingSheet() {
             <Field label="Booking Duration *">
               <select name="bookingType" value={form.bookingType} onChange={handleChange} style={input}>
                 <option value="">Select...</option>
-                {bookingTypes.map(b => <option key={b}>{b}</option>)}
+                {(selectedVehicle ? bookingTypes.filter(bt => selectedVehicle.rates[bt] != null) : bookingTypes).map(b => <option key={b}>{b}</option>)}
               </select>
             </Field>
-            {form.bookingType === 'Day' && (
-              <Field label="Number of Days">
-                <input type="number" name="numDays" value={form.numDays} onChange={handleChange} style={input} placeholder="e.g. 2" min="1" />
-              </Field>
-            )}
-            {form.bookingType === 'Week' && (
-              <Field label="Number of Weeks">
-                <input type="number" name="numWeeks" value={form.numWeeks} onChange={handleChange} style={input} placeholder="e.g. 2" min="1" />
-              </Field>
-            )}
           </div>
           <div style={grid(3)}>
             <Field label="Expected Return Date & Time">
@@ -419,8 +399,11 @@ export default function BookingSheet() {
                 {vehicles.map(v => <option key={v.id}>{v.type}</option>)}
               </select>
             </Field>
-            <Field label="Vehicle Number">
-              <input type="text" value={form.vehicleNumber} style={{ ...input, background: '#f0f4ff' }} readOnly />
+            <Field label="Vehicle Number *">
+              <select name="vehicleNumber" value={form.vehicleNumber} onChange={handleChange} style={input} disabled={!selectedVehicle}>
+                <option value="">Select...</option>
+                {selectedVehicle && selectedVehicle.registrations.map(r => <option key={r}>{r}</option>)}
+              </select>
             </Field>
             <Field label="Start KM">
               <input type="number" name="startKm" value={form.startKm} onChange={handleChange} style={input} placeholder="Odometer reading" />
@@ -617,7 +600,7 @@ export default function BookingSheet() {
                     <td style={tdStyle}>{b.customer_name}</td>
                     <td style={tdStyle}>{b.mobile}</td>
                     <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>
-                    <td style={tdStyle}>{b.booking_type}{b.num_days ? ` (${b.num_days}d)` : ''}{b.num_weeks ? ` (${b.num_weeks}w)` : ''}</td>
+                    <td style={tdStyle}>{b.booking_type}</td>
                     <td style={tdStyle}>{b.expected_return}</td>
                     <td style={tdStyle}>{b.start_km || '—'}</td>
                     <td style={tdStyle}>₹{b.rent_amount}</td>

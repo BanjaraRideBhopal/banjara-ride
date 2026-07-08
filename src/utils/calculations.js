@@ -30,25 +30,14 @@ export function to12hr(time24) {
 }
 
 // Calculate expected return datetime
-export function calculateReturnDateTime(date, time12, bookingType, numDays, numWeeks) {
+export function calculateReturnDateTime(date, time12, bookingType) {
   if (!date || !time12 || !bookingType) return '';
 
   const time24 = to24hr(time12);
   const start = new Date(`${date}T${time24}`);
   if (isNaN(start.getTime())) return '';
 
-  let hoursToAdd = 0;
-
-  if (bookingType === 'Day' && numDays) {
-    hoursToAdd = parseFloat(numDays) * 24;
-  } else if (bookingType === 'Week' && numWeeks) {
-    hoursToAdd = parseFloat(numWeeks) * 168;
-  } else if (bookingType === 'Month') {
-    hoursToAdd = 720; // 30 days
-  } else {
-    hoursToAdd = bookingTypeHours[bookingType] || 0;
-  }
-
+  const hoursToAdd = bookingTypeHours[bookingType] || 0;
   if (!hoursToAdd) return '';
 
   const returnDate = new Date(start.getTime() + hoursToAdd * 60 * 60 * 1000);
@@ -75,16 +64,13 @@ export function calculateDuration(date, time12, returnDateTimeStr) {
 }
 
 // Calculate rent amount with late charge logic
-export function calculateRentAmount(vehicle, bookingType, actualDurationHours, numDays, numWeeks) {
+export function calculateRentAmount(vehicle, bookingType, actualDurationHours) {
   if (!vehicle || !bookingType) return 0;
 
   const baseRate = vehicle.rates[bookingType];
-  let bookedHours = bookingTypeHours[bookingType] || 0;
-
-  if (bookingType === 'Day' && numDays) bookedHours = parseFloat(numDays) * 24;
-  if (bookingType === 'Week' && numWeeks) bookedHours = parseFloat(numWeeks) * 168;
-
   if (!baseRate) return 0;
+
+  const bookedHours = bookingTypeHours[bookingType] || 0;
   if (actualDurationHours <= bookedHours) return baseRate;
 
   const extraHours = Math.ceil(actualDurationHours - bookedHours);
