@@ -9,7 +9,8 @@ import {
   refundStatusOptions,
   reasonForDeductionOptions,
   creditToOptions,
-  refundByOptions
+  refundByOptions,
+  centreOptions,
 } from '../data/options';
 import {
   getCurrentTime12hr,
@@ -28,6 +29,7 @@ const emptyForm = {
   bookingTime: getCurrentTime12hr(),
   bookingType: '',
   expectedReturnDateTime: '',
+  centre: '',
   vehicle: '',
   vehicleNumber: '',
   helmet: '',
@@ -43,6 +45,12 @@ const emptyForm = {
   creditTo: '',
   remarks: '',
 };
+
+function parseTime12hr(timeStr) {
+  const match = timeStr && timeStr.match(/^(\d{1,2}):(\d{2}) (AM|PM)$/);
+  if (!match) return { hour: '12', minute: '00', period: 'AM' };
+  return { hour: match[1].padStart(2, '0'), minute: match[2], period: match[3] };
+}
 
 const emptyFinal = {
   actualReturnDateTime: '',
@@ -110,7 +118,7 @@ export default function BookingSheet() {
       if (v) {
         updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
         if (autoFillAmount) {
-          updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit;
+          updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit + (parseFloat(updated.deliveryCharges) || 0);
         }
       }
     }
@@ -132,7 +140,7 @@ export default function BookingSheet() {
     if (name === 'cash' && !value) updated.paidTo = '';
     if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
 
-    const autoFillAmount = ['vehicle', 'bookingType'].includes(name);
+    const autoFillAmount = ['vehicle', 'bookingType', 'deliveryCharges'].includes(name);
     updated = recalculate(updated, autoFillAmount);
     setForm(updated);
   }
@@ -143,6 +151,7 @@ export default function BookingSheet() {
       bookingTime: b.booking_time,
       bookingType: b.booking_type,
       expectedReturnDateTime: b.expected_return,
+      centre: b.centre || '',
       vehicle: b.vehicle,
       vehicleNumber: b.vehicle_number,
       helmet: b.helmet || '',
@@ -217,6 +226,7 @@ export default function BookingSheet() {
       booking_date: form.bookingDate,
       booking_time: form.bookingTime,
       booking_type: form.bookingType,
+      centre: form.centre,
       expected_return: form.expectedReturnDateTime,
       vehicle: form.vehicle,
       vehicle_number: form.vehicleNumber,
@@ -272,10 +282,10 @@ export default function BookingSheet() {
     const extraHours = parseFloat(updated.extraHours) || 0;
     updated.extraCharge = extraHours * (v ? v.lateChargePerHour : 0);
     updated.rentAmount = baseRent + updated.extraCharge;
-    updated.refundAmount = calculateRefundAmount(
-      booking.full_amount_received, 0,
-      booking.delivery_charges, updated.deduction, updated.rentAmount
-    );
+    const fullAmount = parseFloat(booking.full_amount_received) || 0;
+    const extraCharge = parseFloat(updated.extraCharge) || 0;
+    const deduction = parseFloat(updated.deduction) || 0;
+    updated.refundAmount = fullAmount - baseRent - extraCharge - deduction;
     return updated;
   }
 
@@ -370,12 +380,39 @@ export default function BookingSheet() {
               <input type="date" name="bookingDate" value={form.bookingDate} onChange={handleChange} style={input} />
             </Field>
             <Field label="Booking Time *">
-              <input type="text" name="bookingTime" value={form.bookingTime} onChange={handleChange} style={input} placeholder="HH:MM AM/PM" />
+              {(() => {
+                const { hour, minute, period } = parseTime12hr(form.bookingTime);
+                const setTimePart = (part, val) => {
+                  const cur = parseTime12hr(form.bookingTime);
+                  const updated = { ...cur, [part]: val };
+                  handleChange({ target: { name: 'bookingTime', value: `${updated.hour}:${updated.minute} ${updated.period}` } });
+                };
+                return (
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <select value={hour} onChange={e => setTimePart('hour', e.target.value)} style={{ ...input, padding: '8px 4px' }}>
+                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map(h => <option key={h}>{h}</option>)}
+                    </select>
+                    <select value={minute} onChange={e => setTimePart('minute', e.target.value)} style={{ ...input, padding: '8px 4px' }}>
+                      {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map(m => <option key={m}>{m}</option>)}
+                    </select>
+                    <select value={period} onChange={e => setTimePart('period', e.target.value)} style={{ ...input, padding: '8px 4px' }}>
+                      <option>AM</option>
+                      <option>PM</option>
+                    </select>
+                  </div>
+                );
+              })()}
             </Field>
             <Field label="Booking Duration *">
               <select name="bookingType" value={form.bookingType} onChange={handleChange} style={input}>
                 <option value="">Select...</option>
                 {(selectedVehicle ? bookingTypes.filter(bt => selectedVehicle.rates[bt] != null) : bookingTypes).map(b => <option key={b}>{b}</option>)}
+              </select>
+            </Field>
+            <Field label="Centre *">
+              <select name="centre" value={form.centre} onChange={handleChange} style={input}>
+                <option value="">Select...</option>
+                {centreOptions.map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
           </div>
@@ -577,12 +614,12 @@ export default function BookingSheet() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr>
-                  <th colSpan={9} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
+                  <th colSpan={10} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
                   <th colSpan={8} style={{ ...th, background: '#fef9c3', textAlign: 'center' }}>Return Details</th>
                   <th colSpan={2} style={{ ...th, textAlign: 'center' }}>Actions</th>
                 </tr>
                 <tr>
-                  {['Date', 'Time', 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
+                  {['Date', 'Time', 'Centre', 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
                     <th key={h} style={{ ...th, background: '#dbeafe' }}>{h}</th>
                   ))}
                   {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet'].map(h => (
@@ -597,6 +634,7 @@ export default function BookingSheet() {
                   <tr key={b.id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                     <td style={tdStyle}>{b.booking_date}</td>
                     <td style={tdStyle}>{b.booking_time}</td>
+                    <td style={tdStyle}>{b.centre || '—'}</td>
                     <td style={tdStyle}>{b.customer_name}</td>
                     <td style={tdStyle}>{b.mobile}</td>
                     <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>

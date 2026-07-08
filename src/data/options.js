@@ -28,9 +28,19 @@ export const modeOfPaymentOptions = [
   "App Payment"
 ];
 
+export const centreOptions = [
+  "Sonagiri",
+  "Rani Kamlapati Station",
+  "IISER Bhouri",
+];
+
 export const paidToOptions = [
+  "Lokendra",
+  "Rizwan",
+  "Manish",
+  "Guard",
   "Nazim",
-  "Manish"
+  "Banjara Ride",
 ];
 
 export const refundStatusOptions = [
@@ -52,6 +62,10 @@ export const creditToOptions = [
 ];
 
 export const refundByOptions = [
-  "BanjaraRide"
-  // Staff names will be added here later
+  "Lokendra",
+  "Rizwan",
+  "Manish",
+  "Guard",
+  "Nazim",
+  "Banjara Ride",
 ];
