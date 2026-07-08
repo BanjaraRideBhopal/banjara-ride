@@ -85,12 +85,24 @@ export default function BookingSheet() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [approachingReturns, setApproachingReturns] = useState([]);
+  const [showBell, setShowBell] = useState(false);
+  const [, forceUpdate] = useState(0);
 
   const bookingsRef = useRef([]);
   const notifiedIds = useRef(new Set());
+  const dismissedBannerIds = useRef(new Set());
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
   const returningBooking = bookings.find(b => b.id === returningId);
+
+  const visibleApproaching = approachingReturns.filter(b => !dismissedBannerIds.current.has(b.id));
+  const activeBookings = bookings
+    .filter(b => b.status === 'start')
+    .sort((a, b) => {
+      const ta = parseReturnDT(a.expected_return);
+      const tb = parseReturnDT(b.expected_return);
+      return ta && tb ? ta - tb : !ta ? 1 : -1;
+    });
 
   useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
 
@@ -431,13 +443,64 @@ export default function BookingSheet() {
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1a56a0' }}>Banjara Ride</h1>
           <p style={{ color: '#666', fontSize: '14px' }}>Daily Booking Sheet</p>
         </div>
-        <button onClick={() => {
-          if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() }); }
-          setShowForm(!showForm);
-          setReturningId(null);
-        }} style={btnPrimary}>
-          {showForm ? 'Close Form' : '+ New Booking'}
-        </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+
+          {/* BELL */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowBell(v => !v)}
+              style={{ position: 'relative', background: approachingReturns.length > 0 ? '#fef3c7' : '#f3f4f6', border: '1px solid ' + (approachingReturns.length > 0 ? '#f59e0b' : '#ddd'), borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}
+              title="Return reminders"
+            >
+              🔔
+              {approachingReturns.length > 0 && (
+                <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#dc2626', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {approachingReturns.length}
+                </span>
+              )}
+            </button>
+
+            {showBell && (
+              <>
+                <div onClick={() => setShowBell(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 100, background: 'white', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '16px', minWidth: '300px', maxWidth: '360px', width: 'max-content' }}>
+                  <div style={{ fontWeight: '700', color: '#1a56a0', marginBottom: '12px', fontSize: '14px' }}>Today's Active Returns</div>
+                  {activeBookings.length === 0 ? (
+                    <p style={{ color: '#888', fontSize: '13px' }}>No active bookings</p>
+                  ) : (
+                    activeBookings.map(b => {
+                      const now = new Date();
+                      const rt = parseReturnDT(b.expected_return);
+                      const diffMin = rt ? Math.round((rt - now) / 60000) : null;
+                      const isOverdue = diffMin !== null && diffMin < 0;
+                      const isUrgent = diffMin !== null && diffMin >= 0 && diffMin <= 15;
+                      return (
+                        <div key={b.id} style={{ padding: '8px 0', borderTop: '1px solid #f0f0f0', fontSize: '13px' }}>
+                          <div style={{ fontWeight: '600', color: isOverdue ? '#dc2626' : isUrgent ? '#92400e' : '#333' }}>
+                            {b.customer_name} &nbsp;·&nbsp; {b.vehicle}
+                          </div>
+                          <div style={{ color: '#666', fontSize: '12px', marginTop: '2px' }}>
+                            {b.vehicle_number} &nbsp;·&nbsp; {b.expected_return}
+                            {isOverdue && <span style={{ color: '#dc2626', fontWeight: '600' }}> · OVERDUE</span>}
+                            {isUrgent && !isOverdue && <span style={{ color: '#92400e', fontWeight: '600' }}> · Due soon</span>}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <button onClick={() => {
+            if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() }); }
+            setShowForm(!showForm);
+            setReturningId(null);
+          }} style={btnPrimary}>
+            {showForm ? 'Close Form' : '+ New Booking'}
+          </button>
+        </div>
       </div>
 
       {/* ERROR BANNER */}
@@ -719,13 +782,22 @@ export default function BookingSheet() {
       )}
 
       {/* APPROACHING RETURNS ALERT */}
-      {approachingReturns.length > 0 && (
+      {visibleApproaching.length > 0 && (
         <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: '10px', padding: '14px 20px', marginBottom: '16px' }}>
-          <div style={{ fontWeight: '700', color: '#92400e', marginBottom: '8px', fontSize: '14px' }}>⏰ Return Due in 15 Minutes</div>
-          {approachingReturns.map(b => (
-            <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #fde68a', fontSize: '13px', color: '#78350f' }}>
-              <span>{b.customer_name} &nbsp;·&nbsp; {b.vehicle} ({b.vehicle_number}) &nbsp;·&nbsp; Due: {b.expected_return}</span>
-              <button onClick={() => startReturn(b)} style={{ ...btnPrimary, background: '#f59e0b', padding: '4px 12px', fontSize: '12px', marginLeft: '12px', whiteSpace: 'nowrap' }}>Close Now</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontWeight: '700', color: '#92400e', fontSize: '14px' }}>⏰ Return Due in 15 Minutes</div>
+            <button
+              onClick={() => {
+                visibleApproaching.forEach(b => dismissedBannerIds.current.add(b.id));
+                forceUpdate(n => n + 1);
+              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', fontWeight: '700', fontSize: '18px', lineHeight: 1, padding: '0 4px' }}
+              title="Dismiss"
+            >✕</button>
+          </div>
+          {visibleApproaching.map(b => (
+            <div key={b.id} style={{ padding: '6px 0', borderTop: '1px solid #fde68a', fontSize: '13px', color: '#78350f' }}>
+              {b.customer_name} &nbsp;·&nbsp; {b.vehicle} ({b.vehicle_number}) &nbsp;·&nbsp; Due: {b.expected_return}
             </div>
           ))}
         </div>
