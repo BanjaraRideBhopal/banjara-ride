@@ -81,23 +81,54 @@ export default function BookingSheet() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [filterDate, setFilterDate] = useState(getToday());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchMode, setIsSearchMode] = useState(false);
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
   const returningBooking = bookings.find(b => b.id === returningId);
 
-  useEffect(() => { loadBookings(); }, []);
+  useEffect(() => { loadBookings(getToday()); }, []);
 
-  async function loadBookings() {
+  async function loadBookings(date) {
     setLoading(true);
     const { data, error } = await supabase
       .from('bookings')
       .select('*')
-      .eq('booking_date', getToday())
+      .eq('booking_date', date)
       .order('created_at', { ascending: true });
 
     if (error) setError('Failed to load bookings: ' + error.message);
     else setBookings(data || []);
     setLoading(false);
+  }
+
+  async function handleSearch() {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setLoading(true);
+    setIsSearchMode(true);
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .or(`mobile.ilike.%${q}%,vehicle_number.ilike.%${q}%`)
+      .order('created_at', { ascending: false });
+    if (error) setError('Search failed: ' + error.message);
+    else setBookings(data || []);
+    setLoading(false);
+  }
+
+  function clearSearch() {
+    setSearchQuery('');
+    setIsSearchMode(false);
+    loadBookings(filterDate);
+  }
+
+  function handleDateChange(date) {
+    setFilterDate(date);
+    setIsSearchMode(false);
+    setSearchQuery('');
+    loadBookings(date);
   }
 
   async function lookupCustomer(mobile) {
@@ -640,10 +671,48 @@ export default function BookingSheet() {
         </form>
       )}
 
+      {/* FILTER & SEARCH BAR */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '16px 24px', marginBottom: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'flex', gap: '24px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        {/* Date Filter */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>View Date</label>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button onClick={() => { const d = new Date(filterDate); d.setDate(d.getDate() - 1); const s = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`; handleDateChange(s); }} style={{ ...btnSecondary, padding: '7px 10px', fontSize: '14px' }}>‹</button>
+            <input type="date" value={filterDate} onChange={e => handleDateChange(e.target.value)} style={{ ...input, width: '150px' }} />
+            <button onClick={() => { const d = new Date(filterDate); d.setDate(d.getDate() + 1); const s = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`; handleDateChange(s); }} style={{ ...btnSecondary, padding: '7px 10px', fontSize: '14px' }}>›</button>
+            <button onClick={() => handleDateChange(getToday())} style={{ ...btnSecondary, padding: '7px 12px', fontSize: '12px', color: filterDate === getToday() ? '#1a56a0' : '#666', fontWeight: filterDate === getToday() ? '700' : '400' }}>Today</button>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ width: '1px', background: '#e5e7eb', alignSelf: 'stretch', margin: '0 4px' }} />
+
+        {/* Search */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '240px' }}>
+          <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Search All Bookings</label>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              style={{ ...input, flex: 1 }}
+              placeholder="Mobile number or vehicle number..."
+            />
+            <button onClick={handleSearch} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '13px' }}>Search</button>
+            {isSearchMode && <button onClick={clearSearch} style={{ ...btnSecondary, padding: '8px 12px', fontSize: '13px' }}>✕ Clear</button>}
+          </div>
+        </div>
+      </div>
+
       {/* BOOKINGS TABLE */}
       <div style={formCard}>
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>
-          Today's Bookings ({bookings.length})
+          {isSearchMode
+            ? `Search Results for "${searchQuery}" (${bookings.length})`
+            : filterDate === getToday()
+              ? `Today's Bookings (${bookings.length})`
+              : `Bookings on ${filterDate} (${bookings.length})`}
         </h2>
         {loading ? (
           <p style={{ color: '#999', textAlign: 'center', padding: '40px' }}>Loading...</p>
