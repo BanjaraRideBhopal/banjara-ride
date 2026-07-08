@@ -16,7 +16,6 @@ import {
   getCurrentTime12hr,
   calculateReturnDateTime,
   calculateRentAmount,
-  calculateRefundAmount,
   calculateKmDriven
 } from '../utils/calculations';
 
