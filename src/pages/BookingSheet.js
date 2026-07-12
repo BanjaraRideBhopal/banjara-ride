@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { vehicles } from '../data/vehicles';
 import {
   bookingTypes,
   helmetOptions,
@@ -73,6 +72,8 @@ const emptyFinal = {
 
 export default function BookingSheet() {
   const [form, setForm] = useState(emptyForm);
+  const [vehicles, setVehicles] = useState([]);
+  const [centreIdByName, setCentreIdByName] = useState({});
   const [bookings, setBookings] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -106,14 +107,48 @@ export default function BookingSheet() {
 
   useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
 
+  const RATE_COLUMN_TO_LABEL = {
+    rate_3hr: '3 Hr', rate_6hr: '6 Hr', rate_12hr: '12 Hr',
+    rate_1day: '1 Day', rate_2days: '2 Days', rate_3days: '3 Days',
+    rate_4days: '4 Days', rate_5days: '5 Days', rate_6days: '6 Days',
+    rate_7days: '7 Days', rate_15days: '15 Days', rate_1month: '1 Month',
+    rate_3months: '3 Months',
+  };
+
   useEffect(() => {
     loadBookings(getToday());
+    loadVehiclesAndCentres();
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
     const interval = setInterval(checkApproachingReturns, 60000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadVehiclesAndCentres() {
+    const [{ data: types }, { data: regs }, { data: centres }] = await Promise.all([
+      supabase.from('vehicle_types').select('*'),
+      supabase.from('vehicles').select('*').eq('active', true),
+      supabase.from('centres').select('id, name'),
+    ]);
+    if (types) {
+      setVehicles(types.map(t => ({
+        id: t.id,
+        type: t.name,
+        rates: Object.fromEntries(
+          Object.entries(RATE_COLUMN_TO_LABEL)
+            .filter(([col]) => t[col] !== null)
+            .map(([col, label]) => [label, t[col]])
+        ),
+        lateChargePerHour: t.late_charge_per_hour,
+        securityDeposit: t.security_deposit,
+        registrations: (regs || []).filter(r => r.vehicle_type_id === t.id).map(r => r.registration_number),
+      })));
+    }
+    if (centres) {
+      setCentreIdByName(Object.fromEntries(centres.map(c => [c.name, c.id])));
+    }
+  }
 
   function parseReturnDT(str) {
     if (!str) return null;
@@ -190,13 +225,16 @@ export default function BookingSheet() {
     loadBookings(date);
   }
 
-  async function lookupCustomer(mobile) {
-    if (mobile.length !== 10) return;
+  async function lookupCustomer(mobile, centre) {
+    if (mobile.length !== 10 || !centre) return;
+    const centreId = centreIdByName[centre];
+    if (!centreId) return;
     const { data } = await supabase
       .from('customers')
       .select('name')
       .eq('mobile', mobile)
-      .single();
+      .eq('centre_id', centreId)
+      .maybeSingle();
     if (data) setForm(prev => ({ ...prev, customerName: data.name }));
   }
 
@@ -229,7 +267,8 @@ export default function BookingSheet() {
       updated.rentAmount = '';
       updated.fullAmountReceived = '';
     }
-    if (name === 'mobileNumber') lookupCustomer(value);
+    if (name === 'mobileNumber') lookupCustomer(value, updated.centre);
+    if (name === 'centre' && updated.mobileNumber.length === 10) lookupCustomer(updated.mobileNumber, value);
     if (name === 'cash' && !value) updated.paidTo = '';
     if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
 
@@ -295,17 +334,21 @@ export default function BookingSheet() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.customerName || !form.mobileNumber || !form.vehicle) {
-      alert('Please fill Customer Name, Mobile Number and Vehicle');
+    if (!form.customerName || !form.mobileNumber || !form.vehicle || !form.centre) {
+      alert('Please fill Customer Name, Mobile Number, Vehicle and Centre');
       return;
     }
 
     setSaving(true);
     setError('');
 
+    const centreId = centreIdByName[form.centre];
     const { error: custError } = await supabase
       .from('customers')
-      .upsert({ mobile: form.mobileNumber, name: form.customerName }, { onConflict: 'mobile' });
+      .upsert(
+        { mobile: form.mobileNumber, name: form.customerName, centre_id: centreId },
+        { onConflict: 'mobile,centre_id' }
+      );
 
     if (custError) {
       setError('Failed to save customer: ' + custError.message);
@@ -320,6 +363,7 @@ export default function BookingSheet() {
       booking_time: form.bookingTime,
       booking_type: form.bookingType,
       centre: form.centre,
+      centre_id: centreId,
       expected_return: form.expectedReturnDateTime,
       vehicle: form.vehicle,
       vehicle_number: form.vehicleNumber,
