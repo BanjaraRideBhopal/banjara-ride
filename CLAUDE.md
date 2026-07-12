@@ -1,6 +1,6 @@
 # Banjara Ride — Project Context for Claude
 
-> **Multi-centre build in progress.** See `MULTI_CENTRE_SPEC.md` (repo root) for the full architecture, data model, RLS rules, and phase plan. That file is the source of truth for all multi-centre work — this CLAUDE.md covers the base app.
+> **Multi-centre build in progress.** See `MULTI_CENTRE_SPEC.md` (repo root) for the full architecture, data model, RLS rules, and phase plan. That file is the source of truth for all multi-centre work — this CLAUDE.md covers the base app and current live state.
 
 ## About the Business
 - Company: Banjara Ride, Bhopal, Madhya Pradesh, India
@@ -12,41 +12,87 @@
 
 ## Tech Stack
 - Frontend: React (create-react-app)
-- Database: Supabase (PostgreSQL) — URL: https://bmjminovnhhbrthuqgkt.supabase.co
+- Database: Supabase (PostgreSQL + Auth) — URL: https://bmjminovnhhbrthuqgkt.supabase.co
 - GitHub: github.com/BanjaraRideBhopal/banjara-ride (public)
 - Deployed: https://banjara-ride.vercel.app (Vercel, auto-deploys on push to main)
 - No backend — frontend only
 - Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
-## Current Build Status
-- Daily Booking Sheet — live, mobile-responsive, PWA-installable
-- Folder structure: src/components, src/pages, src/data, src/utils
+## Current Build Status (as of 2026-07-12)
+- Phases 1–4 of multi-centre build are complete and live
+- Phase 1: DB migration — centres, vehicle_types, vehicles tables seeded; bookings/customers restructured with centre_id
+- Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
+- Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
+- Phase 4: Login page live; session routing in App.js; centre-lock for staff
+- Next: Phase 5 (UI — centre switcher for super_admin, remove centre dropdown for staff, bell/search centre labels)
 
 ## Key Files
-- src/data/vehicles.js — All 18 vehicle types with rate groups and registration numbers
-- src/data/options.js — All dropdown options including booking types and payment options
+- src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
+- src/App.js — Session routing: loading → Login → BookingSheet (with profile fetch + no-profile error state)
+- src/data/options.js — All dropdown options including booking types, centreOptions, payment options
 - src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
-- src/pages/BookingSheet.js — Main booking form, table, filter, search, reminders, bell
-- src/supabaseClient.js — Supabase client setup
-- src/index.css — Responsive CSS classes (br-grid-N, br-page, br-header, br-form-card, br-filter, desktop-table, mobile-cards)
+- src/pages/BookingSheet.js — Main booking form; accepts { session, profile } props
+- src/supabaseClient.js — Supabase client setup (shared singleton — import everywhere, never create a second client)
+- src/index.css — Responsive CSS classes (br-grid-N, br-page, br-header, br-form-card, br-filter, br-login-page, br-login-card, desktop-table, mobile-cards)
 - public/manifest.json — PWA manifest
 - public/service-worker.js — Network-first service worker (skips supabase.co calls)
 
+## Auth Accounts
+4 accounts, all @banjararide.com. Passwords are NOT stored in the repo or chat — owner manages them.
+- admin@ — super_admin role, no centre (sees all data)
+- sonagiri@ — staff, Sonagiri centre
+- ranikamlapati@ — staff, Rani Kamlapati Station centre
+- iiser@ — staff, IISER Bhouri centre
+
+## Session / Profile Flow
+- App.js fetches the logged-in user's profiles row: `select('*, centres(name)')` — embedded join gives `profile.centres.name`
+- BookingSheet receives `profile.role` ('super_admin' or 'staff') and `profile.display_name`
+- Header shows display_name + centre (staff) or display_name only (super_admin) + logout button
+- Logout: `supabase.auth.signOut()` — onAuthStateChange in App.js redirects to Login automatically
+
 ## Supabase Tables
+
+### centres
+- id (SERIAL PK), name TEXT UNIQUE
+- Rows: Sonagiri (1), Rani Kamlapati Station (2), IISER Bhouri (3)
+
+### profiles
+- id UUID PK (matches auth.users.id), display_name, role ('super_admin'/'staff'), centre_id FK → centres
+
+### vehicle_types
+- id, name, security_deposit, late_charge_per_hour
+- rate_3hr through rate_3months (13 rate columns, null = duration not available for this type)
+- 18 rows seeded
+
+### vehicles (registrations)
+- id, registration_number, vehicle_type_id FK → vehicle_types, centre_id FK → centres, active BOOL
+- 52 rows seeded — all currently assigned to Sonagiri; Rani Kamlapati + IISER have 0
+
 ### customers
-- mobile (PK), name, created_at
+- id (BIGSERIAL PK — surrogate), mobile TEXT, name TEXT, centre_id INT FK → centres, created_at
+- UNIQUE (mobile, centre_id) — upsert target
+- No cross-centre customer lookup
 
 ### bookings
-- id, mobile, customer_name, booking_date, booking_time, booking_type, centre,
-  expected_return, vehicle, vehicle_number, helmet, start_km, rent_amount,
-  delivery_charges, full_amount_received, cash, paid_to, mode_of_payment, credit_to,
-  remarks, status ('start'/'end'), actual_return, end_km, km_driven, helmet_returned,
-  extra_hours, extra_charge, final_rent, deduction, reason_for_deduction, damaged_fine,
-  refund_amount, refund_status, refund_by, created_at
+- id (BIGINT PK, uses Date.now()), mobile, customer_name, booking_date, booking_time, booking_type
+- centre (TEXT name), centre_id (INT FK → centres) NOT NULL
+- expected_return, vehicle, vehicle_number, helmet, start_km
+- rent_amount, delivery_charges, full_amount_received, cash, paid_to, mode_of_payment, credit_to, remarks
+- status ('start'/'end'), actual_return, end_km, km_driven, helmet_returned
+- extra_hours, extra_charge, final_rent, deduction, reason_for_deduction, damaged_fine
+- refund_amount, refund_status, refund_by, created_at
+
+## RLS (live as of 2026-07-12)
+- Helper functions: `public.get_my_centre_id()` and `public.is_super_admin()` — security definer, stable, granted to authenticated only
+- bookings + customers: staff select/insert/update own centre only; super_admin all; anon blocked; no one can delete except super_admin
+- vehicles: staff select own centre; super_admin can write
+- vehicle_types + centres: all authenticated can select; super_admin can write
+- profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 
 ## Vehicles (18 types, 9 rate groups)
-Rate groups (deposit / late charge):
-- Lectrix EV: ₹800 deposit, ₹65/hr — no 3Hr option
+Vehicle data is now loaded from the `vehicle_types` + `vehicles` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
+Rate groups (deposit / late charge per hour):
+- Lectrix EV: ₹800, ₹65/hr — no 3Hr option
 - Jupiter BS6 / Activa 6G: ₹800, ₹65/hr
 - Activa 5G: ₹800, ₹55/hr
 - StarCityPlus / HF Delux: ₹800, ₹55/hr
@@ -63,26 +109,18 @@ Each is a fixed option with a fixed rate — no number picker needed.
 ## Booking Flow (Two-Phase)
 ### Phase 1 — Initial Booking (vehicle goes out)
 - Vehicle must be selected FIRST — Booking Duration is disabled until vehicle chosen
-- Lectrix EV: 3 Hr option hidden (not available for that vehicle)
-- Form fields: Booking Date, Booking Time (3 dropdowns: hr/min/AM-PM), Centre, Vehicle, Vehicle Number,
-  Booking Duration, Expected Return DateTime (auto), Helmet Given, Start KM,
-  Mobile Number (auto-fills Customer Name for returning customers), Customer Name,
-  Estimated Rent (auto, read-only), Security Deposit (auto, read-only),
-  Delivery Charges, Full Amount Received (auto = Rent + Deposit + Delivery),
-  Mode of Payment (Cash/UPI/App Payment), Cash ₹,
-  Paid To (shows only when Cash > 0 — options: Lokendra/Rizwan/Manish/Guard/Nazim/Banjara Ride),
-  Credit To (shows only when Mode = UPI or App Payment),
-  Remarks
+- Lectrix EV: 3 Hr option hidden (null rate in DB)
+- Centre field: read-only pre-filled for staff; free dropdown for super_admin
+- Vehicle Number: shows friendly message if 0 registrations at staff's centre
+- Mobile Number auto-fills Customer Name for returning customers (lookup filtered by centre_id)
 - Status set to 'start' on save
 
 ### Phase 2 — Close Booking (vehicle returned)
 - Triggered by Close button (only on status='start' rows)
-- Actual Return Date & Time: date picker + 3 time dropdowns (same pattern as booking time)
-- Fields: Helmet Returned, End KM, KM Driven (auto), Extra Hours (manual — staff negotiates),
-  Extra Charge (auto = Extra Hours × vehicle.lateChargePerHour), Actual Rent (auto = base + extra),
-  Deduction ₹, Reason for Deduction (Damage/Helmet Lost/Challan/Penalty),
-  Damage/Fine Description (textarea — only shows when Reason = Damage or Penalty),
-  Refund Amount (auto), Refund Status (Processed/Unprocessed), Refund By
+- Fields: Actual Return Date/Time, Helmet Returned, End KM, KM Driven (auto),
+  Extra Hours (manual), Extra Charge (auto), Actual Rent (auto),
+  Deduction, Reason for Deduction, Damage/Fine Description (conditional),
+  Refund Amount (auto), Refund Status, Refund By
 - Status set to 'end' on save
 
 ## Edit Behaviour
@@ -93,7 +131,7 @@ Each is a fixed option with a fixed rate — no number picker needed.
 ## Auto-Calculations
 - Expected Return DateTime: Booking Date + Time + Duration hours (local timezone — use getFullYear/getMonth/getDate, NEVER toISOString)
 - Full Amount Received: Rent + Security Deposit + Delivery Charges
-- Extra Charge: Extra Hours × vehicle.lateChargePerHour
+- Extra Charge: Extra Hours × vehicle.lateChargePerHour (from DB)
 - Actual Rent: Base Rent + Extra Charge
 - Refund Amount: Full Amount Received − Base Rent − Extra Charges − Deduction
 - KM Driven: End KM − Start KM
@@ -101,16 +139,17 @@ Each is a fixed option with a fixed rate — no number picker needed.
 ## Payment Rules
 - Paid To field: only shows when Cash > 0
 - Credit To field: only shows when Mode of Payment is UPI or App Payment
-- Form has autoComplete="off" to prevent browser autofill
+- Booking form has autoComplete="off"; Login form does NOT (allows browser to save centre passwords)
 
 ## Date Filter & Search
 - Date filter at top: ‹ › navigation + date picker + Today button. Default = today.
 - Search box: searches ALL bookings (all dates) by mobile number or vehicle number (partial match)
 - Search and date filter are mutually exclusive
+- RLS transparently scopes search results to staff's own centre — no app-level centre filter needed
 
 ## Return Reminders & Bell Icon
 - Checks every 60 seconds for active bookings with expected return ≤ 15 min
-- Yellow alert banner appears — has ✕ dismiss button (no Close Now). Dismissed per-booking via ref.
+- Yellow alert banner appears — has ✕ dismiss button. Dismissed per-booking via ref.
 - 🔔 Bell icon in header: red badge count for urgent returns. Click opens dropdown of all active bookings today sorted by expected return time. Overdue = red, due soon = amber.
 
 ## Responsive UI & PWA
@@ -122,7 +161,10 @@ Each is a fixed option with a fixed rate — no number picker needed.
 
 ## Development Approach
 - Requirements first, then build — step by step, one feature at a time
-- Team reviews before building
+- Owner reviews specs before building; approves each migration step individually
 - Always use local date components (never toISOString) for IST timezone correctness
 - When adding new table columns, also update the mobile card view
 - New layout sections use className from index.css, not inline style
+- RLS + login code must always ship atomically — never enable RLS without a login page deployed
+- Never commit .mcp.json or .claude/settings.json (contain Supabase access token)
+- Passwords for auth accounts must never appear in chat, spec files, commit messages, or any repo file
