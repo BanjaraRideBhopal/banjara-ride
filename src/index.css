@@ -48,6 +48,10 @@ body {
 .desktop-table { display: block; overflow-x: auto; }
 .mobile-cards  { display: none; }
 
+/* ── Login page ──────────────────────────────────── */
+.br-login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.br-login-card { width: 100%; max-width: 360px; }
+
 /* ── Tablet (≤ 768px) ────────────────────────────── */
 @media (max-width: 768px) {
   .br-page { padding: 16px; }

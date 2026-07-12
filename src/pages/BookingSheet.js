@@ -70,7 +70,7 @@ const emptyFinal = {
   refundBy: '',
 };
 
-export default function BookingSheet() {
+export default function BookingSheet({ session, profile }) {
   const [form, setForm] = useState(emptyForm);
   const [vehicles, setVehicles] = useState([]);
   const [centreIdByName, setCentreIdByName] = useState({});
@@ -92,6 +92,9 @@ export default function BookingSheet() {
   const bookingsRef = useRef([]);
   const notifiedIds = useRef(new Set());
   const dismissedBannerIds = useRef(new Set());
+
+  const isOwner = profile?.role === 'owner';
+  const profileCentre = profile?.centres?.name || '';
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
   const returningBooking = bookings.find(b => b.id === returningId);
@@ -392,7 +395,7 @@ export default function BookingSheet() {
         setBookings(prev => prev.map(b => b.id === editingId ? data : b));
         setEditingId(null);
         setShowForm(false);
-        setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() });
+        setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre });
       }
     } else {
       const { data, error: insertError } = await supabase
@@ -404,7 +407,7 @@ export default function BookingSheet() {
       if (insertError) setError('Failed to save booking: ' + insertError.message);
       else {
         setBookings(prev => [...prev, data]);
-        setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() });
+        setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre });
         setShowForm(false);
       }
     }
@@ -538,12 +541,25 @@ export default function BookingSheet() {
           </div>
 
           <button onClick={() => {
-            if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() }); }
+            if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre }); }
             setShowForm(!showForm);
             setReturningId(null);
           }} style={btnPrimary}>
             {showForm ? 'Close Form' : '+ New Booking'}
           </button>
+
+          {/* USER IDENTITY + LOGOUT */}
+          {profile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid #e5e7eb', paddingLeft: '12px' }}>
+              <span style={{ fontSize: '13px', color: '#555' }}>
+                <strong>{profile.display_name}</strong>
+                {profile.role === 'owner' ? '' : <span style={{ color: '#888' }}> · {profile.centres?.name}</span>}
+              </span>
+              <button onClick={() => supabase.auth.signOut()} style={{ ...btnSecondary, fontSize: '12px', padding: '6px 10px' }}>
+                Log out
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -598,10 +614,14 @@ export default function BookingSheet() {
               </select>
             </Field>
             <Field label="Centre *">
-              <select name="centre" value={form.centre} onChange={handleChange} style={input}>
-                <option value="">Select...</option>
-                {centreOptions.map(c => <option key={c}>{c}</option>)}
-              </select>
+              {isOwner ? (
+                <select name="centre" value={form.centre} onChange={handleChange} style={input}>
+                  <option value="">Select...</option>
+                  {centreOptions.map(c => <option key={c}>{c}</option>)}
+                </select>
+              ) : (
+                <input type="text" value={profileCentre} style={{ ...input, background: '#f0f4ff' }} readOnly />
+              )}
             </Field>
           </div>
           <div className="br-grid-3">
@@ -625,10 +645,14 @@ export default function BookingSheet() {
               </select>
             </Field>
             <Field label="Vehicle Number *">
-              <select name="vehicleNumber" value={form.vehicleNumber} onChange={handleChange} style={input} disabled={!selectedVehicle}>
-                <option value="">Select...</option>
-                {selectedVehicle && selectedVehicle.registrations.map(r => <option key={r}>{r}</option>)}
-              </select>
+              {selectedVehicle && selectedVehicle.registrations.length === 0 ? (
+                <input type="text" value="" style={{ ...input, background: '#fff7ed', color: '#92400e' }} readOnly placeholder="No registrations at this centre" />
+              ) : (
+                <select name="vehicleNumber" value={form.vehicleNumber} onChange={handleChange} style={input} disabled={!selectedVehicle}>
+                  <option value="">Select...</option>
+                  {selectedVehicle && selectedVehicle.registrations.map(r => <option key={r}>{r}</option>)}
+                </select>
+              )}
             </Field>
             <Field label="Start KM">
               <input type="number" name="startKm" value={form.startKm} onChange={handleChange} style={input} placeholder="Odometer reading" />
@@ -694,7 +718,7 @@ export default function BookingSheet() {
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-            <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr() }); }} style={btnSecondary}>Cancel</button>
+            <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre }); }} style={btnSecondary}>Cancel</button>
             <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving...' : editingId ? 'Update Booking' : 'Save Booking'}
             </button>
