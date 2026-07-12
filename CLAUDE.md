@@ -1,5 +1,7 @@
 # Banjara Ride — Project Context for Claude
 
+> **Multi-centre build in progress.** See `MULTI_CENTRE_SPEC.md` (repo root) for the full architecture, data model, RLS rules, and phase plan. That file is the source of truth for all multi-centre work — this CLAUDE.md covers the base app.
+
 ## About the Business
 - Company: Banjara Ride, Bhopal, Madhya Pradesh, India
 - Est. 2017
