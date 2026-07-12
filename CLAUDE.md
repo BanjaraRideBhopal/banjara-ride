@@ -6,7 +6,7 @@
 - Rental business: Vehicles (bikes/scooters), Electronics, Furniture, Appliances
 - Replacing Google Sheets with this custom app
 - Users: Office staff and manager (multiple simultaneous users)
-- Access: Web browser (desktop + mobile)
+- Access: Web browser (desktop + mobile), installable as PWA
 
 ## Tech Stack
 - Frontend: React (create-react-app)
@@ -14,21 +14,28 @@
 - GitHub: github.com/BanjaraRideBhopal/banjara-ride (public)
 - Deployed: https://banjara-ride.vercel.app (Vercel, auto-deploys on push to main)
 - No backend — frontend only
+- Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
 ## Current Build Status
-- Daily Booking Sheet — live with real vehicle data
+- Daily Booking Sheet — live, mobile-responsive, PWA-installable
 - Folder structure: src/components, src/pages, src/data, src/utils
 
 ## Key Files
 - src/data/vehicles.js — All 18 vehicle types with rate groups and registration numbers
 - src/data/options.js — All dropdown options including booking types and payment options
-- src/utils/calculations.js — Auto-calculation logic (return datetime, rent, refund, KM)
-- src/pages/BookingSheet.js — Main booking form and table
+- src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
+- src/pages/BookingSheet.js — Main booking form, table, filter, search, reminders, bell
 - src/supabaseClient.js — Supabase client setup
+- src/index.css — Responsive CSS classes (br-grid-N, br-page, br-header, br-form-card, br-filter, desktop-table, mobile-cards)
+- public/manifest.json — PWA manifest
+- public/service-worker.js — Network-first service worker (skips supabase.co calls)
 
 ## Supabase Tables
-- customers: mobile (PK), name
-- bookings: id, mobile, customer_name, booking_date, booking_time, booking_type,
+### customers
+- mobile (PK), name, created_at
+
+### bookings
+- id, mobile, customer_name, booking_date, booking_time, booking_type, centre,
   expected_return, vehicle, vehicle_number, helmet, start_km, rent_amount,
   delivery_charges, full_amount_received, cash, paid_to, mode_of_payment, credit_to,
   remarks, status ('start'/'end'), actual_return, end_km, km_driven, helmet_returned,
@@ -49,22 +56,31 @@ Rate groups (deposit / late charge):
 
 ## Booking Durations
 3 Hr / 6 Hr / 12 Hr / 1 Day / 2 Days / 3 Days / 4 Days / 5 Days / 6 Days / 7 Days / 15 Days / 1 Month / 3 Months
-Each is a fixed option with a fixed rate — no "number of days" picker needed.
+Each is a fixed option with a fixed rate — no number picker needed.
 
 ## Booking Flow (Two-Phase)
 ### Phase 1 — Initial Booking (vehicle goes out)
-- Form fields: Booking Date, Time, Duration, Vehicle Type, Vehicle Number (dropdown filtered by type),
-  Helmet, Start KM, Customer Name, Mobile (auto-fills name for returning customers),
-  Estimated Rent (auto), Security Deposit (auto), Delivery Charges, Full Amount Received (auto = Rent + Deposit),
-  Mode of Payment (Cash/UPI/App Payment), Cash ₹, Paid To (shows if cash > 0, options: Nazim/Manish),
-  Credit To (shows if UPI/App Payment), Remarks
+- Vehicle must be selected FIRST — Booking Duration is disabled until vehicle chosen
+- Lectrix EV: 3 Hr option hidden (not available for that vehicle)
+- Form fields: Booking Date, Booking Time (3 dropdowns: hr/min/AM-PM), Centre, Vehicle, Vehicle Number,
+  Booking Duration, Expected Return DateTime (auto), Helmet Given, Start KM,
+  Mobile Number (auto-fills Customer Name for returning customers), Customer Name,
+  Estimated Rent (auto, read-only), Security Deposit (auto, read-only),
+  Delivery Charges, Full Amount Received (auto = Rent + Deposit + Delivery),
+  Mode of Payment (Cash/UPI/App Payment), Cash ₹,
+  Paid To (shows only when Cash > 0 — options: Lokendra/Rizwan/Manish/Guard/Nazim/Banjara Ride),
+  Credit To (shows only when Mode = UPI or App Payment),
+  Remarks
 - Status set to 'start' on save
 
 ### Phase 2 — Close Booking (vehicle returned)
 - Triggered by Close button (only on status='start' rows)
-- Fields: Actual Return DateTime, Helmet Returned, End KM, KM Driven (auto),
-  Extra Hours, Extra Charge (auto = hours × late charge rate), Actual Rent (auto = base + extra),
-  Deduction, Reason for Deduction, Damaged & Fine, Refund Amount (auto), Refund Status, Refund By
+- Actual Return Date & Time: date picker + 3 time dropdowns (same pattern as booking time)
+- Fields: Helmet Returned, End KM, KM Driven (auto), Extra Hours (manual — staff negotiates),
+  Extra Charge (auto = Extra Hours × vehicle.lateChargePerHour), Actual Rent (auto = base + extra),
+  Deduction ₹, Reason for Deduction (Damage/Helmet Lost/Challan/Penalty),
+  Damage/Fine Description (textarea — only shows when Reason = Damage or Penalty),
+  Refund Amount (auto), Refund Status (Processed/Unprocessed), Refund By
 - Status set to 'end' on save
 
 ## Edit Behaviour
@@ -73,11 +89,11 @@ Each is a fixed option with a fixed rate — no "number of days" picker needed.
 - For status='end': opens BOTH initial form AND return details form pre-filled
 
 ## Auto-Calculations
-- Expected Return DateTime: Booking Date + Time + Duration hours (local timezone, not UTC)
-- Full Amount Received: Rent + Security Deposit
+- Expected Return DateTime: Booking Date + Time + Duration hours (local timezone — use getFullYear/getMonth/getDate, NEVER toISOString)
+- Full Amount Received: Rent + Security Deposit + Delivery Charges
 - Extra Charge: Extra Hours × vehicle.lateChargePerHour
 - Actual Rent: Base Rent + Extra Charge
-- Refund Amount: Full Amount Received − Delivery Charges − Deduction − Actual Rent
+- Refund Amount: Full Amount Received − Base Rent − Extra Charges − Deduction
 - KM Driven: End KM − Start KM
 
 ## Payment Rules
@@ -85,8 +101,26 @@ Each is a fixed option with a fixed rate — no "number of days" picker needed.
 - Credit To field: only shows when Mode of Payment is UPI or App Payment
 - Form has autoComplete="off" to prevent browser autofill
 
+## Date Filter & Search
+- Date filter at top: ‹ › navigation + date picker + Today button. Default = today.
+- Search box: searches ALL bookings (all dates) by mobile number or vehicle number (partial match)
+- Search and date filter are mutually exclusive
+
+## Return Reminders & Bell Icon
+- Checks every 60 seconds for active bookings with expected return ≤ 15 min
+- Yellow alert banner appears — has ✕ dismiss button (no Close Now). Dismissed per-booking via ref.
+- 🔔 Bell icon in header: red badge count for urgent returns. Click opens dropdown of all active bookings today sorted by expected return time. Overdue = red, due soon = amber.
+
+## Responsive UI & PWA
+- CSS classes in src/index.css handle responsive layout (not inline styles)
+- Tablet (≤768px): 4/3-col grids → 2-col, header stacks, filter bar stacks
+- Phone (≤480px): all grids → 1-col, bookings shown as cards instead of wide table
+- Mobile card view: .mobile-cards shown, .desktop-table hidden at ≤768px
+- PWA: installable via browser "Add to Home Screen" on Android (Chrome) and iPhone (Safari)
+
 ## Development Approach
-- Requirements first, then build
-- Step by step, one feature at a time
+- Requirements first, then build — step by step, one feature at a time
 - Team reviews before building
-- Bookings table loads today's bookings only (filter by booking_date = today)
+- Always use local date components (never toISOString) for IST timezone correctness
+- When adding new table columns, also update the mobile card view
+- New layout sections use className from index.css, not inline style
