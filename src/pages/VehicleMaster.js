@@ -18,7 +18,7 @@ export default function VehicleMaster({ profile, setActivePage }) {
     const [{ data: veh }, { data: types }, { data: ctrs }] = await Promise.all([
       supabase.from('vehicles').select('*, vehicle_types(name), centres(name, is_franchise)'),
       supabase.from('vehicle_types').select('id, name').order('name'),
-      supabase.from('centres').select('id, name').order('name'),
+      supabase.from('centres').select('id, name, is_franchise').order('name'),
     ]);
     const sorted = (veh || []).sort((a, b) => {
       const ta = a.vehicle_types?.name || '';
@@ -32,8 +32,11 @@ export default function VehicleMaster({ profile, setActivePage }) {
   }
 
   function startEdit(v) {
+    const companyCentreId = centres.find(c => !c.is_franchise)?.id;
+    const isCompany = v.centres && !v.centres.is_franchise;
+    const normalisedId = isCompany && companyCentreId ? String(companyCentreId) : (v.centre_id ? String(v.centre_id) : '');
     setEditingId(v.id);
-    setEditForm({ centre_id: v.centre_id ? String(v.centre_id) : '', active: String(v.active) });
+    setEditForm({ centre_id: normalisedId, active: String(v.active) });
   }
 
   async function saveEdit(id) {
@@ -133,10 +136,15 @@ export default function VehicleMaster({ profile, setActivePage }) {
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Centre *</label>
+              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Group *</label>
               <select value={addForm.centre_id} onChange={e => setAddForm(p => ({ ...p, centre_id: e.target.value }))} style={input}>
                 <option value="">Select...</option>
-                {centres.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {centres.filter(c => !c.is_franchise).length > 0 && (
+                  <option value={String(centres.find(c => !c.is_franchise).id)}>Company Owned</option>
+                )}
+                {centres.filter(c => c.is_franchise).map(c => (
+                  <option key={c.id} value={String(c.id)}>{c.name}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -175,10 +183,15 @@ export default function VehicleMaster({ profile, setActivePage }) {
                       <select
                         value={editForm.centre_id}
                         onChange={e => setEditForm(p => ({ ...p, centre_id: e.target.value }))}
-                        style={{ ...input, width: '200px' }}
+                        style={{ ...input, width: '180px' }}
                       >
                         <option value="">— Unassigned —</option>
-                        {centres.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                        {centres.filter(c => !c.is_franchise).length > 0 && (
+                          <option value={String(centres.find(c => !c.is_franchise).id)}>Company Owned</option>
+                        )}
+                        {centres.filter(c => c.is_franchise).map(c => (
+                          <option key={c.id} value={String(c.id)}>{c.name}</option>
+                        ))}
                       </select>
                     ) : (
                       v.centres
