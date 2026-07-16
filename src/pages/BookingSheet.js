@@ -587,6 +587,29 @@ export default function BookingSheet({ session, profile, setActivePage }) {
             {editingId ? 'Edit Booking' : 'New Booking'}
           </h2>
 
+          <SectionTitle title="Vehicle Details" />
+          <div className="br-grid-3">
+            <Field label="Vehicle *">
+              <select name="vehicle" value={form.vehicle} onChange={handleChange} style={input}>
+                <option value="">Select...</option>
+                {vehicles.filter(v => v.registrations.length > 0).map(v => <option key={v.id}>{v.type}</option>)}
+              </select>
+            </Field>
+            <Field label="Vehicle Number *">
+              {selectedVehicle && selectedVehicle.registrations.length === 0 ? (
+                <input type="text" value="" style={{ ...input, background: '#fff7ed', color: '#92400e' }} readOnly placeholder="No registrations at this centre" />
+              ) : (
+                <select name="vehicleNumber" value={form.vehicleNumber} onChange={handleChange} style={input} disabled={!selectedVehicle}>
+                  <option value="">Select...</option>
+                  {selectedVehicle && selectedVehicle.registrations.map(r => <option key={r}>{r}</option>)}
+                </select>
+              )}
+            </Field>
+            <Field label="Start KM">
+              <input type="number" name="startKm" value={form.startKm} onChange={handleChange} style={input} placeholder="Odometer reading" />
+            </Field>
+          </div>
+
           <SectionTitle title="Trip Details" />
           <div className={isOwner ? "br-grid-4" : "br-grid-3"}>
             <Field label="Booking Date *">
@@ -640,29 +663,6 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                 <option value="">Select...</option>
                 {helmetOptions.map(h => <option key={h}>{h}</option>)}
               </select>
-            </Field>
-          </div>
-
-          <SectionTitle title="Vehicle Details" />
-          <div className="br-grid-3">
-            <Field label="Vehicle *">
-              <select name="vehicle" value={form.vehicle} onChange={handleChange} style={input}>
-                <option value="">Select...</option>
-                {vehicles.filter(v => v.registrations.length > 0).map(v => <option key={v.id}>{v.type}</option>)}
-              </select>
-            </Field>
-            <Field label="Vehicle Number *">
-              {selectedVehicle && selectedVehicle.registrations.length === 0 ? (
-                <input type="text" value="" style={{ ...input, background: '#fff7ed', color: '#92400e' }} readOnly placeholder="No registrations at this centre" />
-              ) : (
-                <select name="vehicleNumber" value={form.vehicleNumber} onChange={handleChange} style={input} disabled={!selectedVehicle}>
-                  <option value="">Select...</option>
-                  {selectedVehicle && selectedVehicle.registrations.map(r => <option key={r}>{r}</option>)}
-                </select>
-              )}
-            </Field>
-            <Field label="Start KM">
-              <input type="number" name="startKm" value={form.startKm} onChange={handleChange} style={input} placeholder="Odometer reading" />
             </Field>
           </div>
 
