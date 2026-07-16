@@ -114,7 +114,7 @@ Each is a fixed option with a fixed rate — no number picker needed.
 
 ## Booking Flow (Two-Phase)
 ### Phase 1 — Initial Booking (vehicle goes out)
-- Vehicle must be selected FIRST — Booking Duration is disabled until vehicle chosen
+- Vehicle Details section appears FIRST in the form (above Trip Details) — user selects vehicle before seeing Booking Duration
 - Lectrix EV: 3 Hr option hidden (null rate in DB)
 - Centre field: read-only pre-filled for staff; free dropdown for super_admin
 - Centre field: removed for staff (form.centre still set via useEffect; header shows centre); super_admin has dropdown
