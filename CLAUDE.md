@@ -70,9 +70,10 @@
 - 52 rows seeded — all currently assigned to Sonagiri; Rani Kamlapati + IISER have 0
 
 ### customers
-- id (BIGSERIAL PK — surrogate), mobile TEXT, name TEXT, centre_id INT FK → centres, created_at
-- UNIQUE (mobile, centre_id) — upsert target
-- No cross-centre customer lookup
+- id (BIGSERIAL PK — surrogate), mobile TEXT, name TEXT, centre_id INT FK → centres (kept for reference only), created_at
+- UNIQUE (mobile) — one customer globally per mobile number
+- Upsert target: onConflict 'mobile', no centre_id in payload
+- Lookup: .eq('mobile').maybeSingle() — no centre filter; RLS fully open to all authenticated
 
 ### bookings
 - id (BIGINT PK, uses Date.now()), mobile, customer_name, booking_date, booking_time, booking_type
@@ -83,10 +84,11 @@
 - extra_hours, extra_charge, final_rent, deduction, reason_for_deduction, damaged_fine
 - refund_amount, refund_status, refund_by, created_at
 
-## RLS (live as of 2026-07-12)
+## RLS (live as of 2026-07-16)
 - Helper functions: `public.get_my_centre_id()`, `public.is_super_admin()`, `public.is_franchise_user()` — security definer, stable, granted to authenticated only
 - bookings: staff select/insert/update own centre only; super_admin all; anon blocked
-- customers + vehicles: company staff (Sonagiri + Rani Kamlapati) see each other's rows; franchise (IISER) see only own; super_admin sees all; writes still per-centre for customers, super_admin only for vehicles
+- customers: all authenticated can read/write — global pool, one mobile = one customer across all centres; anon blocked
+- vehicles: company staff see all company-centre vehicles; franchise (IISER) see only own; super_admin can write
 - vehicle_types + centres: all authenticated can select; super_admin can write
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 
