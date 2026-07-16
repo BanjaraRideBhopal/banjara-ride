@@ -480,6 +480,8 @@ export default function BookingSheet({ session, profile }) {
   }
 
   const showCreditTo = ['UPI', 'App Payment'].includes(form.modeOfPayment);
+  const effectivePaidToOptions = form.centre === 'IISER Bhouri' ? ['Banjara Ride'] : paidToOptions;
+  const effectiveRefundByOptions = returningBooking?.centre === 'IISER Bhouri' ? ['Banjara Ride'] : refundByOptions;
 
   return (
     <div className="br-page">
@@ -697,7 +699,7 @@ export default function BookingSheet({ session, profile }) {
               <Field label="Paid To">
                 <select name="paidTo" value={form.paidTo} onChange={handleChange} style={input}>
                   <option value="">Select...</option>
-                  {paidToOptions.map(p => <option key={p}>{p}</option>)}
+                  {effectivePaidToOptions.map(p => <option key={p}>{p}</option>)}
                 </select>
               </Field>
             )}
@@ -834,7 +836,7 @@ export default function BookingSheet({ session, profile }) {
             <Field label="Refund By">
               <select name="refundBy" value={finalForm.refundBy} onChange={handleFinalChange} style={input}>
                 <option value="">Select...</option>
-                {refundByOptions.map(r => <option key={r}>{r}</option>)}
+                {effectiveRefundByOptions.map(r => <option key={r}>{r}</option>)}
               </select>
             </Field>
           </div>
