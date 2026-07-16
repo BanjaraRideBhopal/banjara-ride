@@ -5,8 +5,10 @@
 }
 
 body {
-  font-family: sans-serif;
-  background: #f5f5f5;
+  font-family: 'Inter', sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ── Page layout ─────────────────────────────────── */
@@ -17,26 +19,54 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  background: white;
+  border-radius: 14px;
+  padding: 16px 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(26,86,160,0.07);
+  border-top: 3px solid #1a56a0;
 }
 
 .br-form-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.07);
 }
 
 .br-filter {
   background: white;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px 24px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.07);
   display: flex;
   gap: 24px;
   align-items: flex-end;
   flex-wrap: wrap;
+}
+
+/* ── Inputs & Selects ────────────────────────────── */
+input:not([type="radio"]):not([type="checkbox"]),
+select {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:not([type="radio"]):not([type="checkbox"]):focus,
+select:focus {
+  outline: none;
+  border-color: #1a56a0 !important;
+  box-shadow: 0 0 0 3px rgba(26,86,160,0.12);
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+button {
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+button:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 /* ── Responsive grids ────────────────────────────── */
@@ -48,30 +78,57 @@ body {
 .desktop-table { display: block; overflow-x: auto; }
 .mobile-cards  { display: none; }
 
+/* ── Table ───────────────────────────────────────── */
+.desktop-table table tbody tr {
+  transition: background 0.1s;
+}
+.desktop-table table tbody tr:hover {
+  background: #f0f4ff !important;
+}
+
 /* ── Centre switcher tabs ────────────────────────── */
 .br-centre-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .br-centre-tab {
-  padding: 5px 12px;
+  padding: 5px 14px;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 20px;
   background: #f8fafc;
   cursor: pointer;
   font-size: 0.82rem;
+  font-weight: 500;
   color: #475569;
+  transition: all 0.15s;
+}
+.br-centre-tab:hover {
+  border-color: #1a56a0;
+  color: #1a56a0;
 }
 .br-centre-tab.active {
   background: #1a56a0;
   color: #fff;
   border-color: #1a56a0;
+  box-shadow: 0 2px 8px rgba(26,86,160,0.25);
 }
 
 /* ── Login page ──────────────────────────────────── */
-.br-login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-.br-login-card { width: 100%; max-width: 360px; }
+.br-login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a56a0 0%, #0f3460 60%, #1a1a2e 100%);
+}
+.br-login-card {
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+  border-radius: 18px !important;
+  padding: 36px !important;
+}
 
 /* ── Tablet (≤ 768px) ────────────────────────────── */
 @media (max-width: 768px) {
-  .br-page { padding: 16px; }
+  .br-page { padding: 12px; }
 
   .br-header { flex-direction: column; align-items: flex-start; gap: 12px; }
   .br-header > button { align-self: stretch; text-align: center; }
