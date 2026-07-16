@@ -58,7 +58,6 @@ export const reasonForDeductionOptions = [
 export const creditToOptions = [
   "BanjaraRide",
   "Both"
-  // Staff names will be added here later
 ];
 
 export const refundByOptions = [
