@@ -70,7 +70,7 @@ const emptyFinal = {
   refundBy: '',
 };
 
-export default function BookingSheet({ session, profile }) {
+export default function BookingSheet({ session, profile, setActivePage }) {
   const [form, setForm] = useState(emptyForm);
   const [vehicles, setVehicles] = useState([]);
   const [centreIdByName, setCentreIdByName] = useState({});
@@ -542,6 +542,12 @@ export default function BookingSheet({ session, profile }) {
               </>
             )}
           </div>
+
+          {isOwner && (
+            <button onClick={() => setActivePage('vehicles')} style={btnSecondary}>
+              Vehicles
+            </button>
+          )}
 
           <button onClick={() => {
             if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre }); }

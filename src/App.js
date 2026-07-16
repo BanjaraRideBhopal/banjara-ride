@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './pages/Login';
 import BookingSheet from './pages/BookingSheet';
+import VehicleMaster from './pages/VehicleMaster';
 
 function App() {
   const [authStatus, setAuthStatus] = useState('loading');
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState('');
+  const [activePage, setActivePage] = useState('bookings');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -17,7 +19,7 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       setAuthStatus(newSession ? 'signedIn' : 'signedOut');
-      if (!newSession) { setProfile(null); setProfileError(''); }
+      if (!newSession) { setProfile(null); setProfileError(''); setActivePage('bookings'); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -48,7 +50,10 @@ function App() {
     </div>
   );
   if (!profile) return null;
-  return <BookingSheet session={session} profile={profile} />;
+  if (activePage === 'vehicles' && profile.role === 'super_admin') {
+    return <VehicleMaster profile={profile} setActivePage={setActivePage} />;
+  }
+  return <BookingSheet session={session} profile={profile} setActivePage={setActivePage} />;
 }
 
 export default App;
