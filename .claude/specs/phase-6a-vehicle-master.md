@@ -1,4 +1,4 @@
-Status: DRAFT — awaiting owner approval.
+Status: COMPLETE — implemented and live as of 2026-07-16.
 
 ---
 
@@ -84,9 +84,9 @@ No new tables. No RLS changes. No CSS file changes beyond minor reuse of existin
 
 ## 6. Exit criteria
 
-- [ ] Super_admin sees a "Vehicles" link in the header; staff do not
-- [ ] Vehicle list loads and shows all vehicles with their type, centre, and active status
-- [ ] Edit saves centre and active changes to Supabase; list refreshes
-- [ ] Adding a new registration inserts into `vehicles`; list refreshes
-- [ ] After assigning a vehicle to Rani Kamlapati or IISER and returning to the booking sheet, those centres' vehicle dropdown shows the newly assigned type
-- [ ] `npm run build` passes with no warnings
+- [x] Super_admin sees a "Vehicles" link in the header; staff do not
+- [x] Vehicle list loads and shows all vehicles with their type, centre, and active status
+- [x] Edit saves centre and active changes to Supabase; list refreshes
+- [x] Adding a new registration inserts into `vehicles`; list refreshes
+- [x] After assigning a vehicle to Rani Kamlapati or IISER and returning to the booking sheet, those centres' vehicle dropdown shows the newly assigned type
+- [x] `npm run build` passes with no warnings

@@ -26,11 +26,13 @@
 - Phase 4: Login page live; session routing in App.js; centre-lock for staff
 - Phase 5a: Company/franchise grouping — IISER fully isolated; Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based RLS
 - Phase 5b: Booking sheet UI — centre switcher tabs for super_admin; centre field removed from staff form; centre column/card/bell scoped to super_admin only; Paid To / Refund By dropdowns scoped by centre (IISER → Banjara Ride only)
-- Next: Phase 6a — Vehicle Master admin page (spec written, awaiting approval)
+- Phase 6a: Vehicle Master — super_admin can assign vehicles to centres, mark inactive, add new registrations
+- Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
-- src/App.js — Session routing: loading → Login → BookingSheet (with profile fetch + no-profile error state)
+- src/App.js — Session routing: loading → Login → BookingSheet or VehicleMaster (activePage state; super_admin only for VehicleMaster)
+- src/pages/VehicleMaster.js — Admin page: assign vehicles to centres, mark inactive, add registrations (super_admin only)
 - src/data/options.js — All dropdown options including booking types, centreOptions, payment options
 - src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
 - src/pages/BookingSheet.js — Main booking form; accepts { session, profile } props
