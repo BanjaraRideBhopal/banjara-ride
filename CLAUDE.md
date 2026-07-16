@@ -24,7 +24,8 @@
 - Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
 - Phase 4: Login page live; session routing in App.js; centre-lock for staff
-- Next: Phase 5 (UI — centre switcher for super_admin, remove centre dropdown for staff, bell/search centre labels)
+- Phase 5a: Company/franchise grouping — IISER fully isolated; Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based RLS
+- Next: Phase 5b (UI — centre switcher for super_admin, remove centre dropdown for staff, bell/search centre labels)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
@@ -53,8 +54,8 @@
 ## Supabase Tables
 
 ### centres
-- id (SERIAL PK), name TEXT UNIQUE
-- Rows: Sonagiri (1), Rani Kamlapati Station (2), IISER Bhouri (3)
+- id (SERIAL PK), name TEXT UNIQUE, is_franchise BOOLEAN NOT NULL DEFAULT false
+- Rows: Sonagiri (1, company), Rani Kamlapati Station (2, company), IISER Bhouri (3, franchise=true)
 
 ### profiles
 - id UUID PK (matches auth.users.id), display_name, role ('super_admin'/'staff'), centre_id FK → centres
@@ -83,9 +84,9 @@
 - refund_amount, refund_status, refund_by, created_at
 
 ## RLS (live as of 2026-07-12)
-- Helper functions: `public.get_my_centre_id()` and `public.is_super_admin()` — security definer, stable, granted to authenticated only
-- bookings + customers: staff select/insert/update own centre only; super_admin all; anon blocked; no one can delete except super_admin
-- vehicles: staff select own centre; super_admin can write
+- Helper functions: `public.get_my_centre_id()`, `public.is_super_admin()`, `public.is_franchise_user()` — security definer, stable, granted to authenticated only
+- bookings: staff select/insert/update own centre only; super_admin all; anon blocked
+- customers + vehicles: company staff (Sonagiri + Rani Kamlapati) see each other's rows; franchise (IISER) see only own; super_admin sees all; writes still per-centre for customers, super_admin only for vehicles
 - vehicle_types + centres: all authenticated can select; super_admin can write
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 
