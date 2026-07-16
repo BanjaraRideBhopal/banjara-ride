@@ -16,7 +16,7 @@ export default function VehicleMaster({ profile, setActivePage }) {
 
   async function loadData() {
     const [{ data: veh }, { data: types }, { data: ctrs }] = await Promise.all([
-      supabase.from('vehicles').select('*, vehicle_types(name), centres(name)'),
+      supabase.from('vehicles').select('*, vehicle_types(name), centres(name, is_franchise)'),
       supabase.from('vehicle_types').select('id, name').order('name'),
       supabase.from('centres').select('id, name').order('name'),
     ]);
@@ -158,7 +158,7 @@ export default function VehicleMaster({ profile, setActivePage }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr>
-                {['Registration No.', 'Vehicle Type', 'Centre', 'Status', 'Edit'].map(h => (
+                {['Registration No.', 'Vehicle Type', 'Group', 'Status', 'Edit'].map(h => (
                   <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
@@ -181,7 +181,9 @@ export default function VehicleMaster({ profile, setActivePage }) {
                         {centres.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                       </select>
                     ) : (
-                      v.centres?.name || <span style={{ color: '#aaa', fontStyle: 'italic' }}>Unassigned</span>
+                      v.centres
+                        ? (v.centres.is_franchise ? v.centres.name : 'Company Owned')
+                        : <span style={{ color: '#aaa', fontStyle: 'italic' }}>Unassigned</span>
                     )}
                   </td>
                   <td style={tdStyle}>
