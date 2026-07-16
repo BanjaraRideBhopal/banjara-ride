@@ -644,7 +644,7 @@ export default function BookingSheet({ session, profile }) {
             <Field label="Vehicle *">
               <select name="vehicle" value={form.vehicle} onChange={handleChange} style={input}>
                 <option value="">Select...</option>
-                {vehicles.map(v => <option key={v.id}>{v.type}</option>)}
+                {vehicles.filter(v => v.registrations.length > 0).map(v => <option key={v.id}>{v.type}</option>)}
               </select>
             </Field>
             <Field label="Vehicle Number *">
