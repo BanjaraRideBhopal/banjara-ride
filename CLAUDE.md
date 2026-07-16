@@ -114,8 +114,9 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Vehicle must be selected FIRST — Booking Duration is disabled until vehicle chosen
 - Lectrix EV: 3 Hr option hidden (null rate in DB)
 - Centre field: read-only pre-filled for staff; free dropdown for super_admin
-- Vehicle Number: shows friendly message if 0 registrations at staff's centre
-- Mobile Number auto-fills Customer Name for returning customers (lookup filtered by centre_id)
+- Vehicle dropdown: filtered to only types with `registrations.length > 0` — franchise staff (IISER, 0 vehicles) see empty dropdown; types appear automatically once vehicles are assigned in DB
+- Vehicle Number: shows amber message "No registrations at this centre" if 0 registrations for selected type (safety-net)
+- Mobile Number auto-fills Customer Name for returning customers (global lookup by mobile — no centre filter)
 - Status set to 'start' on save
 
 ### Phase 2 — Close Booking (vehicle returned)

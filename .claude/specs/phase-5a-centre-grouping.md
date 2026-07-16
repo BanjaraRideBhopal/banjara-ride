@@ -140,6 +140,13 @@ Customer upsert in `handleSubmit`:
 { onConflict: 'mobile' }
 ```
 
+### Step 8 — Hide vehicle types with 0 registrations from dropdown ✓ (2026-07-16)
+Vehicle dropdown in BookingSheet.js filtered to only show types where `registrations.length > 0`:
+```jsx
+{vehicles.filter(v => v.registrations.length > 0).map(v => <option key={v.id}>{v.type}</option>)}
+```
+**Why:** IISER had 0 vehicles assigned. RLS already returned 0 registration rows, but all 18 vehicle types still showed in the dropdown (vehicle_types has no centre filter). With this fix, IISER sees an empty Vehicle dropdown. Sonagiri/Rani Kamlapati see all 18 types (all have registrations). Super admin unchanged (sees all). When IISER vehicles are added to the DB, they appear automatically — no code change needed.
+
 ## 4. Current live state (as of 2026-07-16)
 
 | Table | Policy | Who sees what |
