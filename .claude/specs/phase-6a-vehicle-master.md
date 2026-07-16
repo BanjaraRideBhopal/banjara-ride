@@ -16,32 +16,32 @@ Staff do not see this page.
 
 ### 2a. View — Vehicle list table
 
-A table of all vehicles grouped by vehicle type, showing:
+A table of all vehicles sorted by type name then registration number, showing:
 
-| Registration No. | Vehicle Type | Centre | Active |
+| Registration No. | Vehicle Type | Group | Status |
 |---|---|---|---|
-| MP04HZ1234 | Activa 6G | Sonagiri | Yes |
-| MP04AB5678 | Jupiter BS6 | — (unassigned) | Yes |
+| MP04HZ1234 | Activa 6G | Company Owned | Active |
+| MP04YY0001 | Hunter 350 | IISER Bhouri | Active |
+| MP04AB5678 | Jupiter BS6 | *Unassigned* | Inactive |
 
-- Columns: Registration Number, Vehicle Type, Centre, Active (Yes/No), Edit button
-- Sorted by vehicle type name, then registration number
-- Super_admin only — staff routed away (same guard as other admin pages in the future)
+- **Group column** shows `Company Owned` (for vehicles at any non-franchise centre) or the franchise centre name (e.g. `IISER Bhouri`). Individual centre names (Sonagiri / Rani Kamlapati) are NOT shown — showing them would be misleading since both company centres share the same fleet.
+- Super_admin only — staff have no "Vehicles" nav button.
 
 ### 2b. Edit a vehicle
 
-Click Edit on any row → inline edit row (or modal) opens:
-- **Centre** — dropdown: Sonagiri / Rani Kamlapati Station / IISER Bhouri
-- **Active** — toggle: Yes / No (retiring a vehicle hides it from the booking form dropdown)
+Click Edit on any row → inline dropdowns appear in that row:
+- **Group** — `Company Owned` (saves `centre_id = 1`, Sonagiri as canonical) or franchise centre by name. `startEdit` normalises any company-centre vehicle (whether centre_id=1 or 2) to the canonical company ID so "Company Owned" pre-selects correctly.
+- **Status** — Active / Inactive. Inactive hides the vehicle from the booking form dropdown (`loadVehiclesAndCentres` filters `.eq('active', true)`).
 - Save / Cancel
 
-Only `centre_id` and `active` are editable. Registration number and vehicle type are fixed.
+Registration number and vehicle type are not editable.
 
 ### 2c. Add a new registration
 
-"+ Add Vehicle" button opens a small form:
-- **Registration Number** — text input (e.g. MP04XX9999)
+"+ Add Vehicle" button opens a form above the table:
+- **Registration Number** — text input, saved as uppercase
 - **Vehicle Type** — dropdown of all 18 types
-- **Centre** — dropdown: Sonagiri / Rani Kamlapati Station / IISER Bhouri
+- **Group** — `Company Owned` or franchise centre name (same two-option list as Edit)
 - Save → inserts into `vehicles` table with `active = true`
 
 ---
@@ -61,10 +61,16 @@ Implementation: no React Router needed — add a `[activePage, setActivePage]` s
 
 All reads and writes go through the existing `vehicles` table and `vehicle_types` table.
 
-**Queries:**
-- Load: `supabase.from('vehicles').select('*, vehicle_types(name)').order('vehicle_types(name)').order('registration_number')`
-- Update: `supabase.from('vehicles').update({ centre_id, active }).eq('id', vehicleId)`
+**Queries (as implemented):**
+- Vehicles: `supabase.from('vehicles').select('*, vehicle_types(name), centres(name, is_franchise)')` — sorted client-side by type name then reg number
+- Centres: `supabase.from('centres').select('id, name, is_franchise').order('name')` — `is_franchise` needed to build group dropdown
+- Update: `supabase.from('vehicles').update({ centre_id, active }).eq('id', id)`
 - Insert: `supabase.from('vehicles').insert({ registration_number, vehicle_type_id, centre_id, active: true })`
+
+**Group dropdown logic:**
+- "Company Owned" → `value = centres.find(c => !c.is_franchise).id` (Sonagiri, id=1)
+- Franchise entries → one option per `centres.filter(c => c.is_franchise)` row
+- `startEdit` normalises: if vehicle's current centre is non-franchise, pre-select company canonical ID regardless of whether it's Sonagiri or Rani Kamlapati
 
 **RLS already correct:** `vehicles` write policies allow super_admin only — no DB changes needed.
 
