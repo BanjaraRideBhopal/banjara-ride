@@ -85,6 +85,7 @@ export default function BookingSheet({ session, profile }) {
   const [filterDate, setFilterDate] = useState(getToday());
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const [centreFilter, setCentreFilter] = useState('all');
   const [approachingReturns, setApproachingReturns] = useState([]);
   const [showBell, setShowBell] = useState(false);
   const [, forceUpdate] = useState(0);
@@ -189,13 +190,11 @@ export default function BookingSheet({ session, profile }) {
     });
   }
 
-  async function loadBookings(date) {
+  async function loadBookings(date, cf = centreFilter) {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('booking_date', date)
-      .order('created_at', { ascending: true });
+    let query = supabase.from('bookings').select('*').eq('booking_date', date).order('created_at', { ascending: true });
+    if (isOwner && cf !== 'all') query = query.eq('centre_id', centreIdByName[cf]);
+    const { data, error } = await query;
 
     if (error) setError('Failed to load bookings: ' + error.message);
     else {
@@ -206,16 +205,14 @@ export default function BookingSheet({ session, profile }) {
     setLoading(false);
   }
 
-  async function handleSearch() {
+  async function handleSearch(cf = centreFilter) {
     const q = searchQuery.trim();
     if (!q) return;
     setLoading(true);
     setIsSearchMode(true);
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('*')
-      .or(`mobile.ilike.%${q}%,vehicle_number.ilike.%${q}%`)
-      .order('created_at', { ascending: false });
+    let query = supabase.from('bookings').select('*').or(`mobile.ilike.%${q}%,vehicle_number.ilike.%${q}%`).order('created_at', { ascending: false });
+    if (isOwner && cf !== 'all') query = query.eq('centre_id', centreIdByName[cf]);
+    const { data, error } = await query;
     if (error) setError('Search failed: ' + error.message);
     else setBookings(data || []);
     setLoading(false);
@@ -534,6 +531,7 @@ export default function BookingSheet({ session, profile }) {
                             {isOverdue && <span style={{ color: '#dc2626', fontWeight: '600' }}> · OVERDUE</span>}
                             {isUrgent && !isOverdue && <span style={{ color: '#92400e', fontWeight: '600' }}> · Due soon</span>}
                           </div>
+                          {isOwner && <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>{b.centre}</div>}
                         </div>
                       );
                     })
@@ -556,7 +554,7 @@ export default function BookingSheet({ session, profile }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid #e5e7eb', paddingLeft: '12px' }}>
               <span style={{ fontSize: '13px', color: '#555' }}>
                 <strong>{profile.display_name}</strong>
-                {profile.role === 'owner' ? '' : <span style={{ color: '#888' }}> · {profile.centres?.name}</span>}
+                {!isOwner && <span style={{ color: '#888' }}> · {profile.centres?.name}</span>}
               </span>
               <button onClick={() => supabase.auth.signOut()} style={{ ...btnSecondary, fontSize: '12px', padding: '6px 10px' }}>
                 Log out
@@ -582,7 +580,7 @@ export default function BookingSheet({ session, profile }) {
           </h2>
 
           <SectionTitle title="Trip Details" />
-          <div className="br-grid-4">
+          <div className={isOwner ? "br-grid-4" : "br-grid-3"}>
             <Field label="Booking Date *">
               <input type="date" name="bookingDate" value={form.bookingDate} onChange={handleChange} style={input} />
             </Field>
@@ -616,16 +614,14 @@ export default function BookingSheet({ session, profile }) {
                 {selectedVehicle && bookingTypes.filter(bt => selectedVehicle.rates[bt] != null).map(b => <option key={b}>{b}</option>)}
               </select>
             </Field>
-            <Field label="Centre *">
-              {isOwner ? (
+            {isOwner && (
+              <Field label="Centre *">
                 <select name="centre" value={form.centre} onChange={handleChange} style={input}>
                   <option value="">Select...</option>
                   {centreOptions.map(c => <option key={c}>{c}</option>)}
                 </select>
-              ) : (
-                <input type="text" value={profileCentre} style={{ ...input, background: '#f0f4ff' }} readOnly />
-              )}
-            </Field>
+              </Field>
+            )}
           </div>
           <div className="br-grid-3">
             <Field label="Expected Return Date & Time">
@@ -902,10 +898,38 @@ export default function BookingSheet({ session, profile }) {
               style={{ ...input, flex: 1 }}
               placeholder="Mobile number or vehicle number..."
             />
-            <button onClick={handleSearch} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '13px' }}>Search</button>
+            <button onClick={() => handleSearch()} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '13px' }}>Search</button>
             {isSearchMode && <button onClick={clearSearch} style={{ ...btnSecondary, padding: '8px 12px', fontSize: '13px' }}>✕ Clear</button>}
           </div>
         </div>
+
+        {/* Centre switcher (super_admin only) */}
+        {isOwner && (
+          <>
+            <div className="br-filter-divider" style={{ width: '1px', background: '#e5e7eb', alignSelf: 'stretch', margin: '0 4px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Centre</label>
+              <div className="br-centre-tabs">
+                {['All Centres', ...centreOptions].map(c => {
+                  const val = c === 'All Centres' ? 'all' : c;
+                  return (
+                    <button
+                      key={c}
+                      className={`br-centre-tab${centreFilter === val ? ' active' : ''}`}
+                      onClick={() => {
+                        setCentreFilter(val);
+                        if (!isSearchMode) loadBookings(filterDate, val);
+                        else handleSearch(val);
+                      }}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* BOOKINGS TABLE */}
@@ -928,12 +952,12 @@ export default function BookingSheet({ session, profile }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    <th colSpan={10} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
+                    <th colSpan={isOwner ? 10 : 9} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
                     <th colSpan={8} style={{ ...th, background: '#fef9c3', textAlign: 'center' }}>Return Details</th>
                     <th colSpan={2} style={{ ...th, textAlign: 'center' }}>Actions</th>
                   </tr>
                   <tr>
-                    {['Date', 'Time', 'Centre', 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
+                    {['Date', 'Time', ...(isOwner ? ['Centre'] : []), 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
                       <th key={h} style={{ ...th, background: '#dbeafe' }}>{h}</th>
                     ))}
                     {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet'].map(h => (
@@ -948,7 +972,7 @@ export default function BookingSheet({ session, profile }) {
                     <tr key={b.id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
                       <td style={tdStyle}>{b.booking_date}</td>
                       <td style={tdStyle}>{b.booking_time}</td>
-                      <td style={tdStyle}>{b.centre || '—'}</td>
+                      {isOwner && <td style={tdStyle}>{b.centre || '—'}</td>}
                       <td style={tdStyle}>{b.customer_name}</td>
                       <td style={tdStyle}>{b.mobile}</td>
                       <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>
@@ -1003,7 +1027,7 @@ export default function BookingSheet({ session, profile }) {
                     <strong>{b.vehicle}</strong> &nbsp;·&nbsp; {b.vehicle_number}
                   </div>
                   <div style={{ fontSize: '12px', color: '#555', marginBottom: '4px' }}>
-                    {b.booking_type} &nbsp;·&nbsp; {b.centre || '—'} &nbsp;·&nbsp; {b.booking_date} {b.booking_time}
+                    {b.booking_type}{isOwner ? ` · ${b.centre || '—'}` : ''} &nbsp;·&nbsp; {b.booking_date} {b.booking_time}
                   </div>
                   {b.status === 'start' ? (
                     <div style={{ fontSize: '12px', color: '#92400e', fontWeight: '600', marginBottom: '4px' }}>
