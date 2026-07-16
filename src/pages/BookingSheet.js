@@ -234,15 +234,14 @@ export default function BookingSheet({ session, profile }) {
     loadBookings(date);
   }
 
-  async function lookupCustomer(mobile, centreId) {
+  async function lookupCustomer(mobile) {
     if (mobile.length !== 10) return;
     const { data } = await supabase
       .from('customers')
-      .select('name, centre_id')
-      .eq('mobile', mobile);
-    if (!data || data.length === 0) return;
-    const match = data.find(r => r.centre_id === centreId) || data[0];
-    setForm(prev => ({ ...prev, customerName: match.name }));
+      .select('name')
+      .eq('mobile', mobile)
+      .maybeSingle();
+    if (data) setForm(prev => ({ ...prev, customerName: data.name }));
   }
 
   function recalculate(updated, autoFillAmount = false) {
@@ -274,8 +273,8 @@ export default function BookingSheet({ session, profile }) {
       updated.rentAmount = '';
       updated.fullAmountReceived = '';
     }
-    if (name === 'mobileNumber') lookupCustomer(value, centreIdByName[updated.centre]);
-    if (name === 'centre' && updated.mobileNumber.length === 10) lookupCustomer(updated.mobileNumber, centreIdByName[value]);
+    if (name === 'mobileNumber') lookupCustomer(value);
+    if (name === 'centre' && updated.mobileNumber.length === 10) lookupCustomer(updated.mobileNumber);
     if (name === 'cash' && !value) updated.paidTo = '';
     if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
 
@@ -353,8 +352,8 @@ export default function BookingSheet({ session, profile }) {
     const { error: custError } = await supabase
       .from('customers')
       .upsert(
-        { mobile: form.mobileNumber, name: form.customerName, centre_id: centreId },
-        { onConflict: 'mobile,centre_id' }
+        { mobile: form.mobileNumber, name: form.customerName },
+        { onConflict: 'mobile' }
       );
 
     if (custError) {
