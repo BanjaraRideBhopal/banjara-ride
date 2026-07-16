@@ -25,8 +25,8 @@
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
 - Phase 4: Login page live; session routing in App.js; centre-lock for staff
 - Phase 5a: Company/franchise grouping — IISER fully isolated; Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based RLS
-- Phase 5b: Booking sheet UI — centre switcher tabs for super_admin; centre field removed from staff form; centre column/card/bell scoped to super_admin only
-- Next: Phase 6 (TBD)
+- Phase 5b: Booking sheet UI — centre switcher tabs for super_admin; centre field removed from staff form; centre column/card/bell scoped to super_admin only; Paid To / Refund By dropdowns scoped by centre (IISER → Banjara Ride only)
+- Next: Phase 6a — Vehicle Master admin page (spec written, awaiting approval)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
