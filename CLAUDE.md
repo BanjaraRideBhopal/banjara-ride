@@ -167,6 +167,32 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Mobile card view: .mobile-cards shown, .desktop-table hidden at ≤768px
 - PWA: installable via browser "Add to Home Screen" on Android (Chrome) and iPhone (Safari)
 
+## Code Minimisation — Ponytail (lazy senior dev mode)
+
+Before writing any code, stop at the first rung that holds:
+
+1. Does this need to be built at all? (YAGNI)
+2. Does it already exist in this codebase? Reuse the helper, util, or pattern that's already here.
+3. Does the standard library already do this? Use it.
+4. Does a native platform/React/Supabase feature cover it? Use it.
+5. Does an already-installed dependency solve it? Use it.
+6. Can this be one line? Make it one line.
+7. Only then: write the minimum code that works.
+
+The ladder runs **after** understanding the problem — read the task and trace the real flow end to end, then climb.
+
+Rules:
+- No abstractions that weren't explicitly requested.
+- No new dependency if it can be avoided.
+- No boilerplate nobody asked for.
+- Deletion over addition. Boring over clever. Fewest files possible.
+- Shortest working diff wins, but only once you understand the problem.
+- Question complex requests: "Do you actually need X, or does Y cover it?"
+
+Not lazy about: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, anything explicitly requested.
+
+---
+
 ## Development Approach
 - Requirements first, then build — step by step, one feature at a time
 - Owner reviews specs before building; approves each migration step individually
