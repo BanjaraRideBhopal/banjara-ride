@@ -234,17 +234,14 @@ export default function BookingSheet({ session, profile }) {
     loadBookings(date);
   }
 
-  async function lookupCustomer(mobile, centre) {
-    if (mobile.length !== 10 || !centre) return;
-    const centreId = centreIdByName[centre];
-    if (!centreId) return;
+  async function lookupCustomer(mobile) {
+    if (mobile.length !== 10) return;
     const { data } = await supabase
       .from('customers')
       .select('name')
       .eq('mobile', mobile)
-      .eq('centre_id', centreId)
-      .maybeSingle();
-    if (data) setForm(prev => ({ ...prev, customerName: data.name }));
+      .limit(1);
+    if (data && data.length > 0) setForm(prev => ({ ...prev, customerName: data[0].name }));
   }
 
   function recalculate(updated, autoFillAmount = false) {
@@ -276,8 +273,8 @@ export default function BookingSheet({ session, profile }) {
       updated.rentAmount = '';
       updated.fullAmountReceived = '';
     }
-    if (name === 'mobileNumber') lookupCustomer(value, updated.centre);
-    if (name === 'centre' && updated.mobileNumber.length === 10) lookupCustomer(updated.mobileNumber, value);
+    if (name === 'mobileNumber') lookupCustomer(value);
+    if (name === 'centre' && updated.mobileNumber.length === 10) lookupCustomer(updated.mobileNumber);
     if (name === 'cash' && !value) updated.paidTo = '';
     if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
 
