@@ -25,7 +25,8 @@
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
 - Phase 4: Login page live; session routing in App.js; centre-lock for staff
 - Phase 5a: Company/franchise grouping — IISER fully isolated; Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based RLS
-- Next: Phase 5b (UI — centre switcher for super_admin, remove centre dropdown for staff, bell/search centre labels)
+- Phase 5b: Booking sheet UI — centre switcher tabs for super_admin; centre field removed from staff form; centre column/card/bell scoped to super_admin only
+- Next: Phase 6 (TBD)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
@@ -114,6 +115,7 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Vehicle must be selected FIRST — Booking Duration is disabled until vehicle chosen
 - Lectrix EV: 3 Hr option hidden (null rate in DB)
 - Centre field: read-only pre-filled for staff; free dropdown for super_admin
+- Centre field: removed for staff (form.centre still set via useEffect; header shows centre); super_admin has dropdown
 - Vehicle dropdown: filtered to only types with `registrations.length > 0` — franchise staff (IISER, 0 vehicles) see empty dropdown; types appear automatically once vehicles are assigned in DB
 - Vehicle Number: shows amber message "No registrations at this centre" if 0 registrations for selected type (safety-net)
 - Mobile Number auto-fills Customer Name for returning customers (global lookup by mobile — no centre filter)
