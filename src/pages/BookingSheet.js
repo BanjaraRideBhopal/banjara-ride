@@ -93,7 +93,7 @@ export default function BookingSheet({ session, profile }) {
   const notifiedIds = useRef(new Set());
   const dismissedBannerIds = useRef(new Set());
 
-  const isOwner = profile?.role === 'owner';
+  const isOwner = profile?.role === 'super_admin';
   const profileCentre = profile?.centres?.name || '';
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
@@ -117,6 +117,12 @@ export default function BookingSheet({ session, profile }) {
     rate_7days: '7 Days', rate_15days: '15 Days', rate_1month: '1 Month',
     rate_3months: '3 Months',
   };
+
+  useEffect(() => {
+    if (!isOwner && profileCentre) {
+      setForm(prev => prev.centre ? prev : { ...prev, centre: profileCentre });
+    }
+  }, [isOwner, profileCentre]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadBookings(getToday());
