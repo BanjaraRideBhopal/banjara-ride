@@ -349,7 +349,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     const { error: custError } = await supabase
       .from('customers')
       .upsert(
-        { mobile: form.mobileNumber, name: form.customerName },
+        { mobile: form.mobileNumber, name: form.customerName, centre_id: centreId },
         { onConflict: 'mobile' }
       );
 
