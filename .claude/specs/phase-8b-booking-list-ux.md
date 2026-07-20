@@ -104,3 +104,9 @@ Active Bookings has its own independent `activeSortColumn`/`activeSortDir` state
 - [x] Active Bookings not shown in search mode
 - [x] Edit and Close buttons in Active Bookings work correctly
 - [x] `npm run build` passes with no warnings
+
+## Post-ship bug fix (2026-07-21)
+
+**BUG-008:** Clicking Close on Active Bookings showed a blank page.  
+`returningBooking` was looked up in `bookings` state only. Active Bookings rows live in `activeOutBookings` — so lookup returned `undefined`, `formOpen` hid everything, and the Close form never rendered.  
+**Fix:** `returningBooking = bookings.find(...) || activeOutBookings.find(...)` — searches both states. See `.claude/bug-log.md` BUG-008.

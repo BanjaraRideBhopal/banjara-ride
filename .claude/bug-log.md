@@ -221,4 +221,46 @@ New customers can now be saved. For returning customers (conflict on mobile), `c
 
 ---
 
-*Last updated: 2026-07-18*
+---
+
+## BUG-008 — Blank page when closing a booking from Active Bookings section
+
+**Status:** Fixed  
+**Found:** 2026-07-21  
+**File:** `src/pages/BookingSheet.js`
+
+### What happened
+Clicking the Close button on any row in the Active Bookings card navigated to a completely blank page — only the header was visible. No form appeared.
+
+### Root cause
+`returningBooking` was derived as:
+```js
+const returningBooking = bookings.find(b => b.id === returningId);
+```
+`bookings` state holds only today's date-filtered bookings. Active Bookings (previous-day `status='start'`) are stored in a separate `activeOutBookings` state. So `returningBooking` resolved to `undefined` for any booking from the Active Bookings section.
+
+Two things happened simultaneously:
+1. `startReturn(booking)` set `returningId` → making `formOpen = true` → hiding the filter bar and all booking sections
+2. The Close Booking form gate `{returningBooking && ...}` evaluated to `false` → form did not render
+
+Result: everything hidden, nothing rendered → blank page.
+
+### Fix
+```js
+// Before
+const returningBooking = bookings.find(b => b.id === returningId);
+
+// After
+const returningBooking = bookings.find(b => b.id === returningId)
+  || activeOutBookings.find(b => b.id === returningId);
+```
+
+### Why it occurred
+Phase 8b introduced `activeOutBookings` as a separate state alongside `bookings`. The `returningBooking` lookup was not updated to search both. The bug only manifests when closing from the Active Bookings section; closing from Today's Bookings was unaffected.
+
+### Flow impact
+Close Booking form now opens correctly for bookings from both Today's Bookings and Active Bookings. After closing, the booking is removed from `activeOutBookings` via filter and the form is dismissed.
+
+---
+
+*Last updated: 2026-07-21*
