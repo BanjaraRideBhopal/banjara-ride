@@ -30,6 +30,7 @@
 - Phase 7a: Split payment — Cash / UPI / App Payment fields with individual Paid To dropdowns; payment match indicator; Mode of Payment and Credit To removed
 - Phase 7b: Split refund — Refund Cash / UPI / App Payment fields with individual Refund By dropdowns; refund match indicator; single Refund By removed
 - Phase 8a: Vehicle Master — "+ Add new type..." option in Vehicle Type dropdown; expands inline sub-section with name, deposit, late charge, all 13 rates (all required); two-step save (vehicle_type insert → vehicle insert)
+- Phase 8b: Booking list UX — filter bar + tables hidden while any form is open (formOpen = showForm || !!returningId); Active Bookings card (amber border) shows status='start' bookings from previous days above Today's Bookings; independent sort per section; hidden when empty or in search mode
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
