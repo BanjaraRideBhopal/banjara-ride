@@ -3,11 +3,9 @@ import { supabase } from '../supabaseClient';
 import {
   bookingTypes,
   helmetOptions,
-  modeOfPaymentOptions,
   paidToOptions,
   refundStatusOptions,
   reasonForDeductionOptions,
-  creditToOptions,
   refundByOptions,
   centreOptions,
 } from '../data/options';
@@ -43,8 +41,9 @@ const emptyForm = {
   fullAmountReceived: '',
   cash: '',
   paidTo: '',
-  modeOfPayment: '',
-  creditTo: '',
+  upiAmount: '',
+  upiPaidTo: '',
+  appPaymentAmount: '',
   remarks: '',
 };
 
@@ -252,10 +251,15 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       if (v) {
         updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
         if (autoFillAmount) {
-          updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit + (parseFloat(updated.deliveryCharges) || 0);
+          const estimated = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit + (parseFloat(updated.deliveryCharges) || 0);
+          updated.cash = estimated;
+          updated.upiAmount = '';
+          updated.appPaymentAmount = '';
         }
       }
     }
+    const total = (parseFloat(updated.cash) || 0) + (parseFloat(updated.upiAmount) || 0) + (parseFloat(updated.appPaymentAmount) || 0);
+    updated.fullAmountReceived = total || '';
     return updated;
   }
 
@@ -273,7 +277,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     if (name === 'mobileNumber') lookupCustomer(value);
     if (name === 'centre' && updated.mobileNumber.length === 10) lookupCustomer(updated.mobileNumber);
     if (name === 'cash' && !value) updated.paidTo = '';
-    if (name === 'modeOfPayment' && value === 'Cash') updated.creditTo = '';
+    if (name === 'upiAmount' && !value) updated.upiPaidTo = '';
 
     const autoFillAmount = ['vehicle', 'bookingType', 'deliveryCharges'].includes(name);
     updated = recalculate(updated, autoFillAmount);
@@ -298,8 +302,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       fullAmountReceived: b.full_amount_received || '',
       cash: b.cash || '',
       paidTo: b.paid_to || '',
-      modeOfPayment: b.mode_of_payment || '',
-      creditTo: b.credit_to || '',
+      upiAmount: b.upi_amount || '',
+      upiPaidTo: b.upi_paid_to || '',
+      appPaymentAmount: b.app_payment_amount || '',
       remarks: b.remarks || '',
     };
   }
@@ -377,8 +382,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       full_amount_received: form.fullAmountReceived || 0,
       cash: form.cash || 0,
       paid_to: form.cash ? form.paidTo : null,
-      mode_of_payment: form.modeOfPayment,
-      credit_to: ['UPI', 'App Payment'].includes(form.modeOfPayment) ? form.creditTo : null,
+      upi_amount: form.upiAmount || 0,
+      upi_paid_to: form.upiAmount ? form.upiPaidTo : null,
+      app_payment_amount: form.appPaymentAmount || 0,
       remarks: form.remarks,
     };
 
@@ -479,7 +485,6 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  const showCreditTo = ['UPI', 'App Payment'].includes(form.modeOfPayment);
   const effectivePaidToOptions = form.centre === 'IISER Bhouri' ? ['Banjara Ride'] : paidToOptions;
   const effectiveRefundByOptions = returningBooking?.centre === 'IISER Bhouri' ? ['Banjara Ride'] : refundByOptions;
 
@@ -688,35 +693,35 @@ export default function BookingSheet({ session, profile, setActivePage }) {
               <input type="number" name="deliveryCharges" value={form.deliveryCharges} onChange={handleChange} style={input} placeholder="0" />
             </Field>
             <Field label="Full Amount Received ₹">
-              <input type="number" name="fullAmountReceived" value={form.fullAmountReceived} onChange={handleChange} style={input} placeholder="Auto: Rent + Deposit" />
+              <input type="number" value={form.fullAmountReceived} style={{ ...input, background: '#f0f4ff' }} readOnly />
             </Field>
           </div>
           <div className="br-grid-4">
-            <Field label="Mode of Payment">
-              <select name="modeOfPayment" value={form.modeOfPayment} onChange={handleChange} style={input}>
-                <option value="">Select...</option>
-                {modeOfPaymentOptions.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </Field>
             <Field label="Cash ₹">
               <input type="number" name="cash" value={form.cash} onChange={handleChange} style={input} placeholder="0" />
             </Field>
             {form.cash > 0 && (
-              <Field label="Paid To">
+              <Field label="Cash Paid To">
                 <select name="paidTo" value={form.paidTo} onChange={handleChange} style={input}>
                   <option value="">Select...</option>
                   {effectivePaidToOptions.map(p => <option key={p}>{p}</option>)}
                 </select>
               </Field>
             )}
-            {showCreditTo && (
-              <Field label="Credit To">
-                <select name="creditTo" value={form.creditTo} onChange={handleChange} style={input}>
+            <Field label="UPI ₹">
+              <input type="number" name="upiAmount" value={form.upiAmount} onChange={handleChange} style={input} placeholder="0" />
+            </Field>
+            {form.upiAmount > 0 && (
+              <Field label="UPI Paid To">
+                <select name="upiPaidTo" value={form.upiPaidTo} onChange={handleChange} style={input}>
                   <option value="">Select...</option>
-                  {creditToOptions.map(c => <option key={c}>{c}</option>)}
+                  {effectivePaidToOptions.map(p => <option key={p}>{p}</option>)}
                 </select>
               </Field>
             )}
+            <Field label="App Payment ₹">
+              <input type="number" name="appPaymentAmount" value={form.appPaymentAmount} onChange={handleChange} style={input} placeholder="0" />
+            </Field>
           </div>
           <div className="br-grid-2">
             <Field label="Remarks">

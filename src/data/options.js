@@ -22,12 +22,6 @@ export const bookingTypeHours = {
 
 export const helmetOptions = ["Yes", "No"];
 
-export const modeOfPaymentOptions = [
-  "Cash",
-  "UPI",
-  "App Payment"
-];
-
 export const centreOptions = [
   "Sonagiri",
   "Rani Kamlapati Station",
@@ -55,10 +49,6 @@ export const reasonForDeductionOptions = [
   "Penalty"
 ];
 
-export const creditToOptions = [
-  "BanjaraRide",
-  "Both"
-];
 
 export const refundByOptions = [
   "Lokendra",
