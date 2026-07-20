@@ -92,6 +92,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   const [approachingReturns, setApproachingReturns] = useState([]);
   const [showBell, setShowBell] = useState(false);
   const [, forceUpdate] = useState(0);
+  const [sortColumn, setSortColumn] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
 
   const bookingsRef = useRef([]);
   const notifiedIds = useRef(new Set());
@@ -496,6 +498,18 @@ export default function BookingSheet({ session, profile, setActivePage }) {
 
   const effectivePaidToOptions = form.centre === 'IISER Bhouri' ? ['Banjara Ride'] : paidToOptions;
   const effectiveRefundByOptions = returningBooking?.centre === 'IISER Bhouri' ? ['Banjara Ride'] : refundByOptions;
+
+  function handleSort(col) {
+    if (sortColumn === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortColumn(col); setSortDir('asc'); }
+  }
+
+  const displayedBookings = !sortColumn ? bookings : [...bookings].sort((a, b) => {
+    const va = a[sortColumn] ?? '';
+    const vb = b[sortColumn] ?? '';
+    const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
 
   return (
     <div className="br-page">
@@ -1030,63 +1044,91 @@ export default function BookingSheet({ session, profile, setActivePage }) {
           <>
             {/* Desktop table */}
             <div className="desktop-table">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    <th colSpan={isOwner ? 10 : 9} style={{ ...th, background: '#dbeafe', textAlign: 'center' }}>Initial Booking</th>
-                    <th colSpan={8} style={{ ...th, background: '#fef9c3', textAlign: 'center' }}>Return Details</th>
-                    <th colSpan={2} style={{ ...th, textAlign: 'center' }}>Actions</th>
+                    <th colSpan={isOwner ? 16 : 15} style={{ ...th, background: '#dbeafe', textAlign: 'center', height: '40px' }}>Initial Booking</th>
+                    <th colSpan={9} style={{ ...th, background: '#fef9c3', textAlign: 'center', height: '40px' }}>Return Details</th>
+                    <th colSpan={2} style={{ ...th, background: 'white', textAlign: 'center', height: '40px' }}>Actions</th>
                   </tr>
                   <tr>
-                    {['Date', 'Time', ...(isOwner ? ['Centre'] : []), 'Customer', 'Mobile', 'Vehicle', 'Booking', 'Exp. Return', 'Start KM', 'Est. Rent ₹'].map(h => (
-                      <th key={h} style={{ ...th, background: '#dbeafe' }}>{h}</th>
-                    ))}
-                    {['Status', 'Actual Return', 'End KM', 'KM Driven', 'Extra Hrs', 'Actual Rent ₹', 'Refund ₹', 'Helmet'].map(h => (
-                      <th key={h} style={{ ...th, background: '#fef9c3' }}>{h}</th>
-                    ))}
-                    <th style={th}>Edit</th>
-                    <th style={th}>Close</th>
+                    <SortTh col="booking_date" label="Date" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="booking_time" label="Time" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    {isOwner && <SortTh col="centre" label="Centre" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />}
+                    <SortTh col="customer_name" label="Customer" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="mobile" label="Mobile" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="vehicle" label="Vehicle" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="booking_type" label="Booking" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="expected_return" label="Exp. Return" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="rent_amount" label="Est. Rent ₹" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="delivery_charges" label="Delivery ₹" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="full_amount_received" label="Full Amt ₹" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="cash" label="Cash ₹" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="upi_amount" label="UPI ₹" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="paid_to" label="Paid To" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="mode_of_payment" label="Mode" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="remarks" label="Remarks" bg="#dbeafe" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="status" label="Status" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="actual_return" label="Actual Return" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="extra_hours" label="Extra Hrs" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="final_rent" label="Actual Rent ₹" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="deduction" label="Deduction ₹" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="refund_amount" label="Refund ₹" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="refund_status" label="Refund Status" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="refund_cash_by" label="Refund By" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <SortTh col="helmet_returned" label="Helmet" bg="#fef9c3" sc={sortColumn} sd={sortDir} onSort={handleSort} />
+                    <th style={{ ...th, background: 'white' }}>Edit</th>
+                    <th style={{ ...th, background: 'white' }}>Close</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.map((b, i) => (
-                    <tr key={b.id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#f9f9f9' }}>
-                      <td style={tdStyle}>{b.booking_date}</td>
-                      <td style={tdStyle}>{b.booking_time}</td>
-                      {isOwner && <td style={tdStyle}>{b.centre || '—'}</td>}
-                      <td style={tdStyle}>{b.customer_name}</td>
-                      <td style={tdStyle}>{b.mobile}</td>
-                      <td style={tdStyle}>{b.vehicle} — {b.vehicle_number}</td>
-                      <td style={tdStyle}>{b.booking_type}</td>
-                      <td style={tdStyle}>{b.expected_return}</td>
-                      <td style={tdStyle}>{b.start_km || '—'}</td>
-                      <td style={tdStyle}>₹{b.rent_amount}</td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
-                          background: b.status === 'start' ? '#fef3c7' : '#d1fae5',
-                          color: b.status === 'start' ? '#92400e' : '#065f46'
-                        }}>
-                          {b.status === 'start' ? 'Start' : 'End'}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>{b.actual_return || '—'}</td>
-                      <td style={tdStyle}>{b.end_km || '—'}</td>
-                      <td style={tdStyle}>{b.km_driven ? `${b.km_driven} km` : '—'}</td>
-                      <td style={tdStyle}>{b.extra_hours ? `${b.extra_hours} hr` : '—'}</td>
-                      <td style={tdStyle}>{b.final_rent ? `₹${b.final_rent}` : '—'}</td>
-                      <td style={tdStyle}>{b.refund_amount ? `₹${b.refund_amount}` : '—'}</td>
-                      <td style={tdStyle}>{b.helmet_returned || '—'}</td>
-                      <td style={tdStyle}>
-                        <button onClick={() => startEdit(b)} style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px' }}>Edit</button>
-                      </td>
-                      <td style={tdStyle}>
-                        {b.status === 'start' && (
-                          <button onClick={() => startReturn(b)} style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', background: '#f59e0b' }}>Close</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {displayedBookings.map((b, i) => {
+                    const rowBg = i % 2 === 0 ? 'white' : '#f9f9f9';
+                    const td = { ...tdStyle, background: rowBg, borderBottom: '1px solid #eee' };
+                    const paidTo = [b.paid_to, b.upi_paid_to].filter(Boolean).join(' / ') || '—';
+                    const refundBy = [b.refund_cash_by, b.refund_upi_by].filter(Boolean).join(' / ') || b.refund_by || '—';
+                    return (
+                      <tr key={b.id}>
+                        <td style={td}>{b.booking_date}</td>
+                        <td style={td}>{b.booking_time}</td>
+                        {isOwner && <td style={td}>{b.centre || '—'}</td>}
+                        <td style={td}>{b.customer_name}</td>
+                        <td style={td}>{b.mobile}</td>
+                        <td style={td}>{b.vehicle} — {b.vehicle_number}</td>
+                        <td style={td}>{b.booking_type}</td>
+                        <td style={td}>{b.expected_return}</td>
+                        <td style={td}>{b.rent_amount ? `₹${b.rent_amount}` : '—'}</td>
+                        <td style={td}>{b.delivery_charges ? `₹${b.delivery_charges}` : '—'}</td>
+                        <td style={td}>{b.full_amount_received ? `₹${b.full_amount_received}` : '—'}</td>
+                        <td style={td}>{b.cash ? `₹${b.cash}` : '—'}</td>
+                        <td style={td}>{b.upi_amount ? `₹${b.upi_amount}` : '—'}</td>
+                        <td style={td}>{paidTo}</td>
+                        <td style={td}>{b.mode_of_payment || '—'}</td>
+                        <td style={td}>{b.remarks || '—'}</td>
+                        <td style={td}>
+                          <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: b.status === 'start' ? '#fef3c7' : '#d1fae5', color: b.status === 'start' ? '#92400e' : '#065f46' }}>
+                            {b.status === 'start' ? 'Start' : 'End'}
+                          </span>
+                        </td>
+                        <td style={td}>{b.actual_return || '—'}</td>
+                        <td style={td}>{b.extra_hours ? `${b.extra_hours} hr` : '—'}</td>
+                        <td style={td}>{b.final_rent ? `₹${b.final_rent}` : '—'}</td>
+                        <td style={td}>{b.deduction ? `₹${b.deduction}` : '—'}</td>
+                        <td style={td}>{b.refund_amount ? `₹${b.refund_amount}` : '—'}</td>
+                        <td style={td}>{b.refund_status || '—'}</td>
+                        <td style={td}>{refundBy}</td>
+                        <td style={td}>{b.helmet_returned || '—'}</td>
+                        <td style={td}>
+                          <button onClick={() => startEdit(b)} style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px' }}>Edit</button>
+                        </td>
+                        <td style={td}>
+                          {b.status === 'start' && (
+                            <button onClick={() => startReturn(b)} style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', background: '#f59e0b' }}>Close</button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1154,6 +1196,21 @@ function Field({ label, children }) {
       <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>{label}</label>
       {children}
     </div>
+  );
+}
+
+function SortTh({ col, label, bg, sc, sd, onSort }) {
+  const active = sc === col;
+  return (
+    <th
+      onClick={() => onSort(col)}
+      style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#1a56a0', whiteSpace: 'nowrap', borderBottom: '2px solid #1a56a0', background: bg, cursor: 'pointer', userSelect: 'none' }}
+    >
+      {label}
+      <span style={{ marginLeft: '4px', fontSize: '10px', color: active ? '#1a56a0' : '#bbb' }}>
+        {active ? (sd === 'asc' ? '▲' : '▼') : '⇅'}
+      </span>
+    </th>
   );
 }
 

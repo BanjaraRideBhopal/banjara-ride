@@ -75,14 +75,26 @@ button:active:not(:disabled) {
 .br-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
 
 /* ── Desktop/Mobile visibility ───────────────────── */
-.desktop-table { display: block; overflow-x: auto; }
+.desktop-table { display: block; overflow: auto; max-height: 65vh; border-radius: 8px; }
 .mobile-cards  { display: none; }
 
-/* ── Table ───────────────────────────────────────── */
+/* ── Sticky table headers ────────────────────────── */
+.desktop-table table thead tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.desktop-table table thead tr:last-child th {
+  position: sticky;
+  top: 40px;
+  z-index: 2;
+}
+
+/* ── Table rows ──────────────────────────────────── */
 .desktop-table table tbody tr {
   transition: background 0.1s;
 }
-.desktop-table table tbody tr:hover {
+.desktop-table table tbody tr:hover td {
   background: #f0f4ff !important;
 }
 
