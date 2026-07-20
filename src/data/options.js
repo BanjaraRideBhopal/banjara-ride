@@ -31,6 +31,7 @@ export const centreOptions = [
 export const paidToOptions = [
   "Lokendra",
   "Rizwan",
+  "Risabh Tiwari",
   "Manish",
   "Guard",
   "Nazim",
@@ -53,6 +54,7 @@ export const reasonForDeductionOptions = [
 export const refundByOptions = [
   "Lokendra",
   "Rizwan",
+  "Risabh Tiwari",
   "Manish",
   "Guard",
   "Nazim",

@@ -251,15 +251,10 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       if (v) {
         updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
         if (autoFillAmount) {
-          const estimated = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit + (parseFloat(updated.deliveryCharges) || 0);
-          updated.cash = estimated;
-          updated.upiAmount = '';
-          updated.appPaymentAmount = '';
+          updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit + (parseFloat(updated.deliveryCharges) || 0);
         }
       }
     }
-    const total = (parseFloat(updated.cash) || 0) + (parseFloat(updated.upiAmount) || 0) + (parseFloat(updated.appPaymentAmount) || 0);
-    updated.fullAmountReceived = total || '';
     return updated;
   }
 
@@ -693,7 +688,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
               <input type="number" name="deliveryCharges" value={form.deliveryCharges} onChange={handleChange} style={input} placeholder="0" />
             </Field>
             <Field label="Full Amount Received ₹">
-              <input type="number" value={form.fullAmountReceived} style={{ ...input, background: '#f0f4ff' }} readOnly />
+              <input type="number" name="fullAmountReceived" value={form.fullAmountReceived} onChange={handleChange} style={input} placeholder="Auto: Rent + Deposit" />
             </Field>
           </div>
           <div className="br-grid-4">
@@ -723,6 +718,25 @@ export default function BookingSheet({ session, profile, setActivePage }) {
               <input type="number" name="appPaymentAmount" value={form.appPaymentAmount} onChange={handleChange} style={input} placeholder="0" />
             </Field>
           </div>
+          {(() => {
+            const full = parseFloat(form.fullAmountReceived) || 0;
+            const allocated = (parseFloat(form.cash) || 0) + (parseFloat(form.upiAmount) || 0) + (parseFloat(form.appPaymentAmount) || 0);
+            const diff = full - allocated;
+            if (!full || !allocated) return null;
+            if (diff === 0) return (
+              <div style={{ fontSize: '13px', color: '#059669', fontWeight: '600', marginBottom: '12px' }}>✓ Payments match — ₹{full} fully allocated</div>
+            );
+            if (diff > 0) return (
+              <div style={{ fontSize: '13px', color: '#92400e', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px' }}>
+                ₹{diff} still unallocated — Cash + UPI + App Payment should total ₹{full}
+              </div>
+            );
+            return (
+              <div style={{ fontSize: '13px', color: '#991b1b', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px' }}>
+                ₹{Math.abs(diff)} over-allocated — total exceeds Full Amount of ₹{full}
+              </div>
+            );
+          })()}
           <div className="br-grid-2">
             <Field label="Remarks">
               <input type="text" name="remarks" value={form.remarks} onChange={handleChange} style={input} placeholder="Any additional notes" />
