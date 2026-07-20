@@ -66,7 +66,11 @@ const emptyFinal = {
   damagedFine: '',
   refundAmount: '',
   refundStatus: '',
-  refundBy: '',
+  refundCash: '',
+  refundCashBy: '',
+  refundUpi: '',
+  refundUpiBy: '',
+  refundAppPayment: '',
 };
 
 export default function BookingSheet({ session, profile, setActivePage }) {
@@ -318,7 +322,11 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       damagedFine: b.damaged_fine || '',
       refundAmount: b.refund_amount || '',
       refundStatus: b.refund_status || '',
-      refundBy: b.refund_by || '',
+      refundCash: b.refund_cash || '',
+      refundCashBy: b.refund_cash_by || '',
+      refundUpi: b.refund_upi || '',
+      refundUpiBy: b.refund_upi_by || '',
+      refundAppPayment: b.refund_app_payment || '',
     };
   }
 
@@ -433,6 +441,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   function handleFinalChange(e) {
     const { name, value } = e.target;
     let updated = { ...finalForm, [name]: value };
+    if (name === 'refundCash' && !value) updated.refundCashBy = '';
+    if (name === 'refundUpi' && !value) updated.refundUpiBy = '';
     updated = recalculateFinal(updated, returningBooking);
     setFinalForm(updated);
   }
@@ -458,7 +468,11 @@ export default function BookingSheet({ session, profile, setActivePage }) {
         damaged_fine: finalForm.damagedFine,
         refund_amount: finalForm.refundAmount || 0,
         refund_status: finalForm.refundStatus,
-        refund_by: finalForm.refundBy,
+        refund_cash: finalForm.refundCash || 0,
+        refund_cash_by: finalForm.refundCash ? finalForm.refundCashBy : null,
+        refund_upi: finalForm.refundUpi || 0,
+        refund_upi_by: finalForm.refundUpi ? finalForm.refundUpiBy : null,
+        refund_app_payment: finalForm.refundAppPayment || 0,
       })
       .eq('id', returningId)
       .select()
@@ -858,13 +872,53 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                 {refundStatusOptions.map(r => <option key={r}>{r}</option>)}
               </select>
             </Field>
-            <Field label="Refund By">
-              <select name="refundBy" value={finalForm.refundBy} onChange={handleFinalChange} style={input}>
-                <option value="">Select...</option>
-                {effectiveRefundByOptions.map(r => <option key={r}>{r}</option>)}
-              </select>
+          </div>
+          <div className="br-grid-4">
+            <Field label="Refund Cash ₹">
+              <input type="number" name="refundCash" value={finalForm.refundCash} onChange={handleFinalChange} style={input} placeholder="0" />
+            </Field>
+            {finalForm.refundCash > 0 && (
+              <Field label="Cash Refund By">
+                <select name="refundCashBy" value={finalForm.refundCashBy} onChange={handleFinalChange} style={input}>
+                  <option value="">Select...</option>
+                  {effectiveRefundByOptions.map(r => <option key={r}>{r}</option>)}
+                </select>
+              </Field>
+            )}
+            <Field label="Refund UPI ₹">
+              <input type="number" name="refundUpi" value={finalForm.refundUpi} onChange={handleFinalChange} style={input} placeholder="0" />
+            </Field>
+            {finalForm.refundUpi > 0 && (
+              <Field label="UPI Refund By">
+                <select name="refundUpiBy" value={finalForm.refundUpiBy} onChange={handleFinalChange} style={input}>
+                  <option value="">Select...</option>
+                  {effectiveRefundByOptions.map(r => <option key={r}>{r}</option>)}
+                </select>
+              </Field>
+            )}
+            <Field label="Refund App Payment ₹">
+              <input type="number" name="refundAppPayment" value={finalForm.refundAppPayment} onChange={handleFinalChange} style={input} placeholder="0" />
             </Field>
           </div>
+          {(() => {
+            const total = parseFloat(finalForm.refundAmount) || 0;
+            const allocated = (parseFloat(finalForm.refundCash) || 0) + (parseFloat(finalForm.refundUpi) || 0) + (parseFloat(finalForm.refundAppPayment) || 0);
+            const diff = total - allocated;
+            if (!total || !allocated) return null;
+            if (diff === 0) return (
+              <div style={{ fontSize: '13px', color: '#059669', fontWeight: '600', marginBottom: '12px' }}>✓ Refund matches — ₹{total} fully allocated</div>
+            );
+            if (diff > 0) return (
+              <div style={{ fontSize: '13px', color: '#92400e', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px' }}>
+                ₹{diff} still unallocated — Cash + UPI + App Payment should total ₹{total}
+              </div>
+            );
+            return (
+              <div style={{ fontSize: '13px', color: '#991b1b', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px' }}>
+                ₹{Math.abs(diff)} over-allocated — total exceeds Refund Amount of ₹{total}
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
             <button type="button" onClick={() => setReturningId(null)} style={btnSecondary}>Cancel</button>
