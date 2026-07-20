@@ -106,7 +106,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   const profileCentre = profile?.centres?.name || '';
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
-  const returningBooking = bookings.find(b => b.id === returningId);
+  const returningBooking = bookings.find(b => b.id === returningId) || activeOutBookings.find(b => b.id === returningId);
 
   const visibleApproaching = approachingReturns.filter(b => !dismissedBannerIds.current.has(b.id));
   const activeBookings = bookings
