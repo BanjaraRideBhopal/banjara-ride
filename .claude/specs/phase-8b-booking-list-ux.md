@@ -60,7 +60,7 @@ Call `loadActiveBookings()` wherever `loadBookings()` is called (initial load, d
 
 ### UI — Active Bookings card
 
-Displayed above Today's Bookings (or the search results). Only shown when `activeOutBookings.length > 0`.
+Displayed **below** Today's Bookings. Only shown when `activeOutBookings.length > 0`.
 
 ```
 ┌─────────────────────────────────────────────┐
