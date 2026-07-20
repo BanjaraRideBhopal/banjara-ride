@@ -1196,17 +1196,6 @@ export default function BookingSheet({ session, profile, setActivePage }) {
         )}
       </div>
 
-      {/* ACTIVE BOOKINGS */}
-      {activeOutBookings.length > 0 && !isSearchMode && (
-        <div className="br-form-card" style={{ borderLeft: '4px solid #d97706' }}>
-          <h2 style={{ marginBottom: '4px', color: '#92400e', fontSize: '18px' }}>
-            Active Bookings ({activeOutBookings.length})
-          </h2>
-          <p style={{ color: '#999', fontSize: '13px', marginBottom: '16px' }}>Vehicles still out from previous days</p>
-          {renderTable(displayedActiveBookings, activeOutBookings, activeSortColumn, activeSortDir, handleActiveSort)}
-        </div>
-      )}
-
       {/* BOOKINGS TABLE */}
       <div className="br-form-card">
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>
@@ -1222,6 +1211,17 @@ export default function BookingSheet({ session, profile, setActivePage }) {
           <p style={{ color: '#999', textAlign: 'center', padding: '40px' }}>No bookings yet. Click "+ New Booking" to add one.</p>
         ) : renderTable(displayedBookings, bookings, sortColumn, sortDir, handleSort)}
       </div>
+
+      {/* ACTIVE BOOKINGS */}
+      {activeOutBookings.length > 0 && !isSearchMode && (
+        <div className="br-form-card" style={{ borderLeft: '4px solid #d97706' }}>
+          <h2 style={{ marginBottom: '4px', color: '#92400e', fontSize: '18px' }}>
+            Active Bookings ({activeOutBookings.length})
+          </h2>
+          <p style={{ color: '#999', fontSize: '13px', marginBottom: '16px' }}>Vehicles still out from previous days</p>
+          {renderTable(displayedActiveBookings, activeOutBookings, activeSortColumn, activeSortDir, handleActiveSort)}
+        </div>
+      )}
 
       </>
       )}
