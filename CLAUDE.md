@@ -18,8 +18,8 @@
 - No backend — frontend only
 - Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
-## Current Build Status (as of 2026-07-12)
-- Phases 1–4 of multi-centre build are complete and live
+## Current Build Status (as of 2026-07-21)
+- Phases 1–7a of multi-centre build are complete and live
 - Phase 1: DB migration — centres, vehicle_types, vehicles tables seeded; bookings/customers restructured with centre_id
 - Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
@@ -27,6 +27,7 @@
 - Phase 5a: Company/franchise grouping — IISER fully isolated; Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based RLS
 - Phase 5b: Booking sheet UI — centre switcher tabs for super_admin; centre field removed from staff form; centre column/card/bell scoped to super_admin only; Paid To / Refund By dropdowns scoped by centre (IISER → Banjara Ride only)
 - Phase 6a: Vehicle Master — super_admin can assign vehicles to centres, mark inactive, add new registrations
+- Phase 7a: Split payment — Cash / UPI / App Payment fields with individual Paid To dropdowns; payment match indicator; Mode of Payment and Credit To removed
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -145,8 +146,13 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - KM Driven: End KM − Start KM
 
 ## Payment Rules
-- Paid To field: only shows when Cash > 0
-- Credit To field: only shows when Mode of Payment is UPI or App Payment
+- Three payment fields: Cash ₹, UPI ₹, App Payment ₹ (any combination allowed)
+- Full Amount Received = auto-calculated (Rent + Deposit + Delivery), editable — this is the TARGET
+- Payment match indicator shows when any payment field is filled: green=match, amber=under, red=over
+- Cash Paid To: shows when Cash > 0. Centre-scoped: IISER → Banjara Ride only; others → full staff list
+- UPI Paid To: shows when UPI > 0. Same centre-scoped options
+- Mode of Payment and Credit To: removed from UI (DB columns kept for historic data)
+- Staff list (Paid To / Refund By): Lokendra, Rizwan, Risabh Tiwari, Manish, Guard, Nazim, Banjara Ride
 - Booking form has autoComplete="off"; Login form does NOT (allows browser to save centre passwords)
 
 ## Date Filter & Search
