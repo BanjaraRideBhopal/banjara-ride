@@ -29,12 +29,13 @@
 - Phase 6a: Vehicle Master — super_admin can assign vehicles to centres, mark inactive, add new registrations
 - Phase 7a: Split payment — Cash / UPI / App Payment fields with individual Paid To dropdowns; payment match indicator; Mode of Payment and Credit To removed
 - Phase 7b: Split refund — Refund Cash / UPI / App Payment fields with individual Refund By dropdowns; refund match indicator; single Refund By removed
+- Phase 8a: Vehicle Master — "+ Add new type..." option in Vehicle Type dropdown; expands inline sub-section with name, deposit, late charge, all 13 rates (all required); two-step save (vehicle_type insert → vehicle insert)
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
 - src/App.js — Session routing: loading → Login → BookingSheet or VehicleMaster (activePage state; super_admin only for VehicleMaster)
-- src/pages/VehicleMaster.js — Admin page: assign vehicles to centres, mark inactive, add registrations (super_admin only)
+- src/pages/VehicleMaster.js — Admin page: assign vehicles to centres, mark inactive, add registrations, add new vehicle types inline (super_admin only)
 - src/data/options.js — All dropdown options including booking types, centreOptions, payment options
 - src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
 - src/pages/BookingSheet.js — Main booking form; accepts { session, profile } props

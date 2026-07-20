@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
+const emptyAdd = {
+  registration_number: '', vehicle_type_id: '', centre_id: '', isNewType: false,
+  newTypeName: '', newTypeDeposit: '', newTypeLateCharge: '',
+  rate3hr: '', rate6hr: '', rate12hr: '', rate1day: '', rate2days: '', rate3days: '',
+  rate4days: '', rate5days: '', rate6days: '', rate7days: '', rate15days: '', rate1month: '', rate3months: '',
+};
+
 export default function VehicleMaster({ profile, setActivePage }) {
   const [vehicles, setVehicles] = useState([]);
   const [vehicleTypes, setVehicleTypes] = useState([]);
@@ -8,7 +15,7 @@ export default function VehicleMaster({ profile, setActivePage }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ centre_id: '', active: 'true' });
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ registration_number: '', vehicle_type_id: '', centre_id: '' });
+  const [addForm, setAddForm] = useState(emptyAdd);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,22 +63,75 @@ export default function VehicleMaster({ profile, setActivePage }) {
       alert('Please fill Registration Number, Vehicle Type, and Centre');
       return;
     }
+    if (addForm.isNewType) {
+      const rateFields = ['rate3hr','rate6hr','rate12hr','rate1day','rate2days','rate3days','rate4days','rate5days','rate6days','rate7days','rate15days','rate1month','rate3months'];
+      if (!addForm.newTypeName.trim() || !addForm.newTypeDeposit || !addForm.newTypeLateCharge || rateFields.some(f => addForm[f] === '')) {
+        alert('Please fill all vehicle type fields including all 13 rates');
+        return;
+      }
+    }
     setSaving(true);
     setError('');
+
+    let vehicleTypeId = parseInt(addForm.vehicle_type_id);
+
+    if (addForm.isNewType) {
+      const { data: newType, error: typeErr } = await supabase.from('vehicle_types').insert({
+        name: addForm.newTypeName.trim(),
+        security_deposit: parseInt(addForm.newTypeDeposit),
+        late_charge_per_hour: parseInt(addForm.newTypeLateCharge),
+        rate_3hr: parseInt(addForm.rate3hr),
+        rate_6hr: parseInt(addForm.rate6hr),
+        rate_12hr: parseInt(addForm.rate12hr),
+        rate_1day: parseInt(addForm.rate1day),
+        rate_2days: parseInt(addForm.rate2days),
+        rate_3days: parseInt(addForm.rate3days),
+        rate_4days: parseInt(addForm.rate4days),
+        rate_5days: parseInt(addForm.rate5days),
+        rate_6days: parseInt(addForm.rate6days),
+        rate_7days: parseInt(addForm.rate7days),
+        rate_15days: parseInt(addForm.rate15days),
+        rate_1month: parseInt(addForm.rate1month),
+        rate_3months: parseInt(addForm.rate3months),
+      }).select('id').single();
+      if (typeErr) { setError(typeErr.message); setSaving(false); return; }
+      vehicleTypeId = newType.id;
+    }
+
     const { error: err } = await supabase.from('vehicles').insert({
       registration_number: addForm.registration_number.trim().toUpperCase(),
-      vehicle_type_id: parseInt(addForm.vehicle_type_id),
+      vehicle_type_id: vehicleTypeId,
       centre_id: parseInt(addForm.centre_id),
       active: true,
     });
     if (err) setError(err.message);
     else {
       setShowAddForm(false);
-      setAddForm({ registration_number: '', vehicle_type_id: '', centre_id: '' });
+      setAddForm(emptyAdd);
       await loadData();
     }
     setSaving(false);
   }
+
+  function handleTypeChange(val) {
+    setAddForm(p => ({
+      ...p,
+      vehicle_type_id: val,
+      isNewType: val === '__new__',
+      ...(val !== '__new__' ? {
+        newTypeName: '', newTypeDeposit: '', newTypeLateCharge: '',
+        rate3hr: '', rate6hr: '', rate12hr: '', rate1day: '', rate2days: '', rate3days: '',
+        rate4days: '', rate5days: '', rate6days: '', rate7days: '', rate15days: '', rate1month: '', rate3months: '',
+      } : {}),
+    }));
+  }
+
+  const rateLabels = [
+    ['rate3hr','3 Hr'], ['rate6hr','6 Hr'], ['rate12hr','12 Hr'], ['rate1day','1 Day'],
+    ['rate2days','2 Days'], ['rate3days','3 Days'], ['rate4days','4 Days'], ['rate5days','5 Days'],
+    ['rate6days','6 Days'], ['rate7days','7 Days'], ['rate15days','15 Days'], ['rate1month','1 Month'],
+    ['rate3months','3 Months'],
+  ];
 
   return (
     <div className="br-page">
@@ -119,7 +179,7 @@ export default function VehicleMaster({ profile, setActivePage }) {
           <h2 style={{ marginBottom: '20px', color: '#1a56a0', fontSize: '18px' }}>Add New Vehicle</h2>
           <div className="br-grid-3">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Registration Number *</label>
+              <label style={labelStyle}>Registration Number *</label>
               <input
                 type="text"
                 value={addForm.registration_number}
@@ -129,14 +189,15 @@ export default function VehicleMaster({ profile, setActivePage }) {
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Vehicle Type *</label>
-              <select value={addForm.vehicle_type_id} onChange={e => setAddForm(p => ({ ...p, vehicle_type_id: e.target.value }))} style={input}>
+              <label style={labelStyle}>Vehicle Type *</label>
+              <select value={addForm.vehicle_type_id} onChange={e => handleTypeChange(e.target.value)} style={input}>
                 <option value="">Select...</option>
+                <option value="__new__">+ Add new type...</option>
                 {vehicleTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Group *</label>
+              <label style={labelStyle}>Group *</label>
               <select value={addForm.centre_id} onChange={e => setAddForm(p => ({ ...p, centre_id: e.target.value }))} style={input}>
                 <option value="">Select...</option>
                 {centres.filter(c => !c.is_franchise).length > 0 && (
@@ -148,8 +209,63 @@ export default function VehicleMaster({ profile, setActivePage }) {
               </select>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
-            <button onClick={() => { setShowAddForm(false); setAddForm({ registration_number: '', vehicle_type_id: '', centre_id: '' }); }} style={btnSecondary}>Cancel</button>
+
+          {/* NEW VEHICLE TYPE SUB-SECTION */}
+          {addForm.isNewType && (
+            <div style={{ marginTop: '16px', padding: '16px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+              <p style={{ fontSize: '13px', fontWeight: '600', color: '#065f46', marginBottom: '14px' }}>New Vehicle Type Details</p>
+              <div className="br-grid-3" style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={labelStyle}>Type Name *</label>
+                  <input
+                    type="text"
+                    value={addForm.newTypeName}
+                    onChange={e => setAddForm(p => ({ ...p, newTypeName: e.target.value }))}
+                    style={input}
+                    placeholder="e.g. Pulsar NS 125"
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={labelStyle}>Security Deposit ₹ *</label>
+                  <input
+                    type="number"
+                    value={addForm.newTypeDeposit}
+                    onChange={e => setAddForm(p => ({ ...p, newTypeDeposit: e.target.value }))}
+                    style={input}
+                    placeholder="e.g. 800"
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={labelStyle}>Late Charge / Hr ₹ *</label>
+                  <input
+                    type="number"
+                    value={addForm.newTypeLateCharge}
+                    onChange={e => setAddForm(p => ({ ...p, newTypeLateCharge: e.target.value }))}
+                    style={input}
+                    placeholder="e.g. 65"
+                  />
+                </div>
+              </div>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#555', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rates ₹ (all required)</p>
+              <div className="br-grid-4">
+                {rateLabels.map(([field, label]) => (
+                  <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={labelStyle}>{label}</label>
+                    <input
+                      type="number"
+                      value={addForm[field]}
+                      onChange={e => setAddForm(p => ({ ...p, [field]: e.target.value }))}
+                      style={input}
+                      placeholder="₹"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <button onClick={() => { setShowAddForm(false); setAddForm(emptyAdd); }} style={btnSecondary}>Cancel</button>
             <button onClick={saveAdd} disabled={saving} style={{ ...btnPrimary, background: '#059669', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving...' : 'Add Vehicle'}
             </button>
@@ -241,6 +357,7 @@ export default function VehicleMaster({ profile, setActivePage }) {
   );
 }
 
+const labelStyle = { fontSize: '12px', color: '#666', fontWeight: '500' };
 const input = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', width: '100%', outline: 'none' };
 const tdStyle = { padding: '10px 12px', color: '#333', whiteSpace: 'nowrap' };
 const th = { padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#1a56a0', whiteSpace: 'nowrap', borderBottom: '2px solid #1a56a0', background: '#f0f4ff' };
