@@ -28,6 +28,7 @@
 - Phase 5b: Booking sheet UI — centre switcher tabs for super_admin; centre field removed from staff form; centre column/card/bell scoped to super_admin only; Paid To / Refund By dropdowns scoped by centre (IISER → Banjara Ride only)
 - Phase 6a: Vehicle Master — super_admin can assign vehicles to centres, mark inactive, add new registrations
 - Phase 7a: Split payment — Cash / UPI / App Payment fields with individual Paid To dropdowns; payment match indicator; Mode of Payment and Credit To removed
+- Phase 7b: Split refund — Refund Cash / UPI / App Payment fields with individual Refund By dropdowns; refund match indicator; single Refund By removed
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -129,7 +130,7 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Fields: Actual Return Date/Time, Helmet Returned, End KM, KM Driven (auto),
   Extra Hours (manual), Extra Charge (auto), Actual Rent (auto),
   Deduction, Reason for Deduction, Damage/Fine Description (conditional),
-  Refund Amount (auto), Refund Status, Refund By
+  Refund Amount (auto, TARGET), Refund Status, Refund Cash / UPI / App Payment ₹ with individual Refund By dropdowns; refund match indicator
 - Status set to 'end' on save
 
 ## Edit Behaviour
@@ -152,6 +153,9 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Cash Paid To: shows when Cash > 0. Centre-scoped: IISER → Banjara Ride only; others → full staff list
 - UPI Paid To: shows when UPI > 0. Same centre-scoped options
 - Mode of Payment and Credit To: removed from UI (DB columns kept for historic data)
+- Refund By (single): removed from UI (Phase 7b). DB column kept for historic data.
+- Refund split: Refund Cash ₹ → Cash Refund By (when > 0) → Refund UPI ₹ → UPI Refund By (when > 0) → Refund App Payment ₹
+- Refund match indicator: same green/amber/red logic as payment indicator, compares Refund Amount vs sum of split refund fields
 - Staff list (Paid To / Refund By): Lokendra, Rizwan, Risabh Tiwari, Manish, Guard, Nazim, Banjara Ride
 - Booking form has autoComplete="off"; Login form does NOT (allows browser to save centre passwords)
 
