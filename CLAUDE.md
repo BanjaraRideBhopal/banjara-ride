@@ -99,16 +99,17 @@
 - vehicle_types + centres: all authenticated can select; super_admin can write
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 
-## Vehicles (18 types, 9 rate groups)
+## Vehicles (21 types, 10 rate groups)
 Vehicle data is now loaded from the `vehicle_types` + `vehicles` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
 Rate groups (deposit / late charge per hour):
 - Lectrix EV: ₹800, ₹65/hr — no 3Hr option
 - Jupiter BS6 / Activa 6G: ₹800, ₹65/hr
 - Activa 5G: ₹800, ₹55/hr
 - StarCityPlus / HF Delux: ₹800, ₹55/hr
-- Dream Yuga / Splendor+ / TVS Sport / Shine (BS4): ₹800, ₹55/hr
-- Shine BS6: ₹800, ₹65/hr
-- Honda SP / Pulsar 125 / Gixxer: ₹800, ₹75/hr
+- Dream Yuga / Splendor+ / TVS Sport / Shine BS4: ₹800, ₹55/hr
+- Shine BS6 / Honda SP Old: ₹800, ₹65/hr
+- Honda SP New / Pulsar 125 / Gixxer / Shine Digital: ₹800, ₹75/hr
+- Access 125: ₹0, ₹70/hr — no security deposit
 - Thunderbird: ₹1000, ₹110/hr
 - CB 350 / Hunter 350 / Classic 350: ₹1500, ₹120/hr
 

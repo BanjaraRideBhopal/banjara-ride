@@ -95,7 +95,7 @@ Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based 
 
 **profiles** — `id UUID` (= `auth.users.id`), `display_name`, `role` ('super_admin'/'staff'), `centre_id`. No writes via API — service role only.
 
-**vehicle_types** — `name`, `security_deposit`, `late_charge_per_hour`, 13 rate columns (`rate_3hr` … `rate_3months`, null = duration unavailable). 20 types seeded.
+**vehicle_types** — `name`, `security_deposit`, `late_charge_per_hour`, 13 rate columns (`rate_3hr` … `rate_3months`, null = duration unavailable). 21 types seeded (confirmed live, 2026-07-21). Note: Access 125 has `security_deposit = 0` (intentional — no deposit required for this vehicle), unlike every other type (₹800–₹1500).
 
 **vehicles** — `registration_number`, `vehicle_type_id`, `centre_id`, `active`. 52 rows, all at Sonagiri.
 
