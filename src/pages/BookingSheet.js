@@ -307,6 +307,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   }
 
   function formFromBooking(b) {
+    const v = vehicles.find(veh => veh.type === b.vehicle);
     return {
       bookingDate: b.booking_date,
       bookingTime: b.booking_time,
@@ -320,7 +321,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       customerName: b.customer_name,
       mobileNumber: b.mobile,
       rentAmount: b.rent_amount || '',
-      securityDeposit: b.security_deposit || '',
+      // security_deposit defaults to 0 on bookings saved before this column existed —
+      // fall back to the vehicle's current deposit rate so old bookings don't show blank
+      securityDeposit: b.security_deposit || (v && v.securityDeposit) || '',
       deliveryCharges: b.delivery_charges || '',
       fullAmountReceived: b.full_amount_received || '',
       cash: b.cash || '',
