@@ -18,8 +18,8 @@
 - No backend — frontend only
 - Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
-## Current Build Status (as of 2026-07-21)
-- Phases 1–7a of multi-centre build are complete and live
+## Current Build Status (as of 2026-07-29)
+- Phases 1–9 of multi-centre build are complete and live
 - Phase 1: DB migration — centres, vehicle_types, vehicles tables seeded; bookings/customers restructured with centre_id
 - Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
@@ -31,6 +31,7 @@
 - Phase 7b: Split refund — Refund Cash / UPI / App Payment fields with individual Refund By dropdowns; refund match indicator; single Refund By removed
 - Phase 8a: Vehicle Master — "+ Add new type..." option in Vehicle Type dropdown; expands inline sub-section with name, deposit, late charge, all 13 rates (all required); two-step save (vehicle_type insert → vehicle insert)
 - Phase 8b: Booking list UX — filter bar + tables hidden while any form is open (formOpen = showForm || !!returningId); Active Bookings card (amber border) shows status='start' bookings from previous days above Today's Bookings; independent sort per section; hidden when empty or in search mode
+- Phase 9: Editable auto-filled fields (Rent Amount, Security Deposit, Extra Hours/Days Charge, Actual Rent, Refund Amount — all editable with guarded recalculation cascade); Extra Days field parallel to Extra Hours in close booking (extra_days, extra_days_charge DB columns; Total Extra Charge = Extra Hours Charge + Extra Days Charge); super_admin Delete button on every booking row (Today's + Active Bookings, desktop + mobile)
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -86,10 +87,11 @@
 - id (BIGINT PK, uses Date.now()), mobile, customer_name, booking_date, booking_time, booking_type
 - centre (TEXT name), centre_id (INT FK → centres) NOT NULL
 - expected_return, vehicle, vehicle_number, helmet, start_km
-- rent_amount, delivery_charges, full_amount_received, cash, paid_to, mode_of_payment, credit_to, remarks
+- rent_amount, security_deposit (added Phase 9, NUMERIC DEFAULT 0), delivery_charges, full_amount_received, cash, paid_to, mode_of_payment, credit_to, remarks
 - status ('start'/'end'), actual_return, end_km, km_driven, helmet_returned
-- extra_hours, extra_charge, final_rent, deduction, reason_for_deduction, damaged_fine
+- extra_hours, extra_charge (= Extra Hours Charge in UI), extra_days, extra_days_charge (both added Phase 9, NUMERIC DEFAULT 0), final_rent, deduction, reason_for_deduction, damaged_fine
 - refund_amount, refund_status, refund_by, created_at
+- Legacy/unused: num_days, num_weeks (TEXT — predate centre restructure, not read or written by current code)
 
 ## RLS (live as of 2026-07-16)
 - Helper functions: `public.get_my_centre_id()`, `public.is_super_admin()`, `public.is_franchise_user()` — security definer, stable, granted to authenticated only
@@ -141,13 +143,23 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - For status='start': opens initial booking form pre-filled
 - For status='end': opens BOTH initial form AND return details form pre-filled
 
+## Delete Behaviour (Phase 9, super_admin only)
+- Delete button visible only when `isOwner` (super_admin), on every row in both Today's Bookings and Active Bookings, desktop table and mobile cards
+- `window.confirm()` before delete — no modal component
+- `supabase.from('bookings').delete().eq('id', bookingId)` — customer record untouched
+- On success: row removed from local `bookings`/`activeOutBookings` state immediately, no reload
+- RLS policy `bookings_delete_super_admin_only` (`using (is_super_admin())`) already enforces this at the DB layer — the `isOwner` UI check is a convenience guard only
+
 ## Auto-Calculations
 - Expected Return DateTime: Booking Date + Time + Duration hours (local timezone — use getFullYear/getMonth/getDate, NEVER toISOString)
 - Full Amount Received: Rent + Security Deposit + Delivery Charges
-- Extra Charge: Extra Hours × vehicle.lateChargePerHour (from DB)
-- Actual Rent: Base Rent + Extra Charge
-- Refund Amount: Full Amount Received − Base Rent − Extra Charges − Deduction
+- Extra Hours Charge: Extra Hours × vehicle.lateChargePerHour (from DB)
+- Extra Days Charge: Extra Days × vehicle rate_1day (from DB)
+- Total Extra Charge: Extra Hours Charge + Extra Days Charge
+- Actual Rent: Base Rent + Total Extra Charge
+- Refund Amount: Full Amount Received − Actual Rent − Deduction
 - KM Driven: End KM − Start KM
+- **Phase 9:** Rent Amount, Security Deposit, Extra Hours Charge, Extra Days Charge, Total Extra Charge, Actual Rent, and Refund Amount are all editable (not readOnly). Each still auto-fills on its trigger event, but a manual edit is never silently overwritten — `recalculate()`/`recalculateFinal()` take a `triggerField` param and skip auto-setting whichever field the user just typed into. Downstream fields still recalculate from the edited value (e.g. editing Actual Rent recalculates Refund Amount).
 
 ## Payment Rules
 - Three payment fields: Cash ₹, UPI ₹, App Payment ₹ (any combination allowed)

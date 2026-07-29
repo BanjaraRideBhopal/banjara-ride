@@ -37,6 +37,7 @@ const emptyForm = {
   customerName: '',
   mobileNumber: '',
   rentAmount: '',
+  securityDeposit: '',
   deliveryCharges: '',
   fullAmountReceived: '',
   cash: '',
@@ -59,7 +60,10 @@ const emptyFinal = {
   kmDriven: '',
   helmetReturned: '',
   extraHours: '',
-  extraCharge: '',
+  extraHoursCharge: '',
+  extraDays: '',
+  extraDaysCharge: '',
+  totalExtraCharge: '',
   rentAmount: '',
   deduction: '',
   reasonForDeduction: '',
@@ -260,20 +264,22 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     if (data) setForm(prev => ({ ...prev, customerName: data.name }));
   }
 
-  function recalculate(updated, autoFillAmount = false) {
+  function recalculate(updated, autoFillAmount = false, triggerField = '') {
     const returnDT = calculateReturnDateTime(
       updated.bookingDate, updated.bookingTime, updated.bookingType
     );
     updated.expectedReturnDateTime = returnDT;
 
-    if (updated.vehicle && updated.bookingType) {
-      const v = vehicles.find(veh => veh.type === updated.vehicle);
-      if (v) {
-        updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
-        if (autoFillAmount) {
-          updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + v.securityDeposit + (parseFloat(updated.deliveryCharges) || 0);
-        }
-      }
+    const v = updated.vehicle ? vehicles.find(veh => veh.type === updated.vehicle) : null;
+
+    if (v && triggerField === 'vehicle') {
+      updated.securityDeposit = v.securityDeposit;
+    }
+    if (v && updated.bookingType && (triggerField === 'vehicle' || triggerField === 'bookingType')) {
+      updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
+    }
+    if (autoFillAmount) {
+      updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + (parseFloat(updated.securityDeposit) || 0) + (parseFloat(updated.deliveryCharges) || 0);
     }
     return updated;
   }
@@ -287,6 +293,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       updated.vehicleNumber = v && v.registrations.length === 1 ? v.registrations[0] : '';
       updated.bookingType = '';
       updated.rentAmount = '';
+      updated.securityDeposit = '';
       updated.fullAmountReceived = '';
     }
     if (name === 'mobileNumber') lookupCustomer(value);
@@ -294,8 +301,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     if (name === 'cash' && !value) updated.paidTo = '';
     if (name === 'upiAmount' && !value) updated.upiPaidTo = '';
 
-    const autoFillAmount = ['vehicle', 'bookingType', 'deliveryCharges'].includes(name);
-    updated = recalculate(updated, autoFillAmount);
+    const autoFillAmount = ['vehicle', 'bookingType', 'deliveryCharges', 'rentAmount', 'securityDeposit'].includes(name);
+    updated = recalculate(updated, autoFillAmount, name);
     setForm(updated);
   }
 
@@ -313,6 +320,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       customerName: b.customer_name,
       mobileNumber: b.mobile,
       rentAmount: b.rent_amount || '',
+      securityDeposit: b.security_deposit || '',
       deliveryCharges: b.delivery_charges || '',
       fullAmountReceived: b.full_amount_received || '',
       cash: b.cash || '',
@@ -325,13 +333,18 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   }
 
   function finalFormFromBooking(b) {
+    const extraHoursCharge = parseFloat(b.extra_charge) || 0;
+    const extraDaysCharge = parseFloat(b.extra_days_charge) || 0;
     return {
       actualReturnDateTime: b.actual_return || '',
       endKm: b.end_km || '',
       kmDriven: b.km_driven || '',
       helmetReturned: b.helmet_returned || '',
       extraHours: b.extra_hours || '',
-      extraCharge: b.extra_charge || '',
+      extraHoursCharge: b.extra_charge || '',
+      extraDays: b.extra_days || '',
+      extraDaysCharge: b.extra_days_charge || '',
+      totalExtraCharge: extraHoursCharge + extraDaysCharge,
       rentAmount: b.final_rent || '',
       deduction: b.deduction || '',
       reasonForDeduction: b.reason_for_deduction || '',
@@ -397,6 +410,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       helmet: form.helmet,
       start_km: form.startKm,
       rent_amount: form.rentAmount || 0,
+      security_deposit: form.securityDeposit || 0,
       delivery_charges: form.deliveryCharges || 0,
       full_amount_received: form.fullAmountReceived || 0,
       cash: form.cash || 0,
@@ -440,17 +454,35 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     setSaving(false);
   }
 
-  function recalculateFinal(updated, booking) {
+  function recalculateFinal(updated, booking, triggerField = '') {
     updated.kmDriven = calculateKmDriven(booking.start_km, updated.endKm);
     const v = vehicles.find(veh => veh.type === booking.vehicle);
     const baseRent = v ? calculateRentAmount(v, booking.booking_type, 0) : 0;
-    const extraHours = parseFloat(updated.extraHours) || 0;
-    updated.extraCharge = extraHours * (v ? v.lateChargePerHour : 0);
-    updated.rentAmount = baseRent + updated.extraCharge;
-    const fullAmount = parseFloat(booking.full_amount_received) || 0;
-    const extraCharge = parseFloat(updated.extraCharge) || 0;
-    const deduction = parseFloat(updated.deduction) || 0;
-    updated.refundAmount = fullAmount - baseRent - extraCharge - deduction;
+    const rate1Day = v ? (v.rates['1 Day'] || 0) : 0;
+
+    if (triggerField === 'extraHours') {
+      const extraHours = parseFloat(updated.extraHours) || 0;
+      updated.extraHoursCharge = extraHours * (v ? v.lateChargePerHour : 0);
+    }
+    if (triggerField === 'extraDays') {
+      const extraDays = parseFloat(updated.extraDays) || 0;
+      updated.extraDaysCharge = extraDays * rate1Day;
+    }
+    if (triggerField !== 'totalExtraCharge') {
+      const extraHoursCharge = parseFloat(updated.extraHoursCharge) || 0;
+      const extraDaysCharge = parseFloat(updated.extraDaysCharge) || 0;
+      updated.totalExtraCharge = extraHoursCharge + extraDaysCharge;
+    }
+    if (triggerField !== 'rentAmount') {
+      const totalExtraCharge = parseFloat(updated.totalExtraCharge) || 0;
+      updated.rentAmount = baseRent + totalExtraCharge;
+    }
+    if (triggerField !== 'refundAmount') {
+      const fullAmount = parseFloat(booking.full_amount_received) || 0;
+      const rentAmount = parseFloat(updated.rentAmount) || 0;
+      const deduction = parseFloat(updated.deduction) || 0;
+      updated.refundAmount = fullAmount - rentAmount - deduction;
+    }
     return updated;
   }
 
@@ -459,7 +491,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     let updated = { ...finalForm, [name]: value };
     if (name === 'refundCash' && !value) updated.refundCashBy = '';
     if (name === 'refundUpi' && !value) updated.refundUpiBy = '';
-    updated = recalculateFinal(updated, returningBooking);
+    updated = recalculateFinal(updated, returningBooking, name);
     setFinalForm(updated);
   }
 
@@ -477,7 +509,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
         km_driven: finalForm.kmDriven,
         helmet_returned: finalForm.helmetReturned,
         extra_hours: finalForm.extraHours || 0,
-        extra_charge: finalForm.extraCharge || 0,
+        extra_charge: finalForm.extraHoursCharge || 0,
+        extra_days: finalForm.extraDays || 0,
+        extra_days_charge: finalForm.extraDaysCharge || 0,
         final_rent: finalForm.rentAmount || 0,
         deduction: finalForm.deduction || 0,
         reason_for_deduction: finalForm.reasonForDeduction,
@@ -509,6 +543,18 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     setFinalForm({ ...emptyFinal, actualReturnDateTime: `${getToday()} ${getCurrentTime12hr()}` });
     setShowForm(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleDelete(bookingId) {
+    const ok = window.confirm('Delete this booking? This cannot be undone.');
+    if (!ok) return;
+    const { error } = await supabase.from('bookings').delete().eq('id', bookingId);
+    if (error) {
+      alert('Delete failed: ' + error.message);
+      return;
+    }
+    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    setActiveOutBookings(prev => prev.filter(b => b.id !== bookingId));
   }
 
   const effectivePaidToOptions = form.centre === 'IISER Bhouri' ? ['Banjara Ride'] : paidToOptions;
@@ -548,8 +594,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
             <thead>
               <tr>
                 <th colSpan={isOwner ? 16 : 15} style={{ ...th, background: '#dbeafe', textAlign: 'center', height: '40px' }}>Initial Booking</th>
-                <th colSpan={9} style={{ ...th, background: '#fef9c3', textAlign: 'center', height: '40px' }}>Return Details</th>
-                <th colSpan={2} style={{ ...th, background: 'white', textAlign: 'center', height: '40px' }}>Actions</th>
+                <th colSpan={11} style={{ ...th, background: '#fef9c3', textAlign: 'center', height: '40px' }}>Return Details</th>
+                <th colSpan={isOwner ? 3 : 2} style={{ ...th, background: 'white', textAlign: 'center', height: '40px' }}>Actions</th>
               </tr>
               <tr>
                 <SortTh col="booking_date" label="Date" bg="#dbeafe" sc={sc} sd={sd} onSort={onSort} />
@@ -571,6 +617,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                 <SortTh col="status" label="Status" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
                 <SortTh col="actual_return" label="Actual Return" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
                 <SortTh col="extra_hours" label="Extra Hrs" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
+                <SortTh col="extra_days" label="Extra Days" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
+                <SortTh col="extra_days_charge" label="Extra Days ₹" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
                 <SortTh col="final_rent" label="Actual Rent ₹" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
                 <SortTh col="deduction" label="Deduction ₹" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
                 <SortTh col="refund_amount" label="Refund ₹" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
@@ -579,6 +627,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                 <SortTh col="helmet_returned" label="Helmet" bg="#fef9c3" sc={sc} sd={sd} onSort={onSort} />
                 <th style={{ ...th, background: 'white' }}>Edit</th>
                 <th style={{ ...th, background: 'white' }}>Close</th>
+                {isOwner && <th style={{ ...th, background: 'white' }}>Delete</th>}
               </tr>
             </thead>
             <tbody>
@@ -612,6 +661,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                     </td>
                     <td style={td}>{b.actual_return || '—'}</td>
                     <td style={td}>{b.extra_hours ? `${b.extra_hours} hr` : '—'}</td>
+                    <td style={td}>{b.extra_days ? `${b.extra_days} day${b.extra_days > 1 ? 's' : ''}` : '—'}</td>
+                    <td style={td}>{b.extra_days_charge ? `₹${b.extra_days_charge}` : '—'}</td>
                     <td style={td}>{b.final_rent ? `₹${b.final_rent}` : '—'}</td>
                     <td style={td}>{b.deduction ? `₹${b.deduction}` : '—'}</td>
                     <td style={td}>{b.refund_amount ? `₹${b.refund_amount}` : '—'}</td>
@@ -626,6 +677,11 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                         <button onClick={() => startReturn(b)} style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', background: '#f59e0b' }}>Close</button>
                       )}
                     </td>
+                    {isOwner && (
+                      <td style={td}>
+                        <button onClick={() => handleDelete(b.id)} style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fee2e2', color: '#991b1b', cursor: 'pointer', fontWeight: '600' }}>Delete</button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -663,11 +719,15 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                 Rent ₹{b.rent_amount} &nbsp;·&nbsp; Full ₹{b.full_amount_received}
                 {b.status === 'end' && b.refund_amount ? ` · Refund ₹${b.refund_amount}` : ''}
                 {b.km_driven ? ` · ${b.km_driven} km` : ''}
+                {b.status === 'end' && b.extra_days ? ` · Extra ${b.extra_days}d (₹${b.extra_days_charge || 0})` : ''}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={() => startEdit(b)} style={{ ...btnSecondary, padding: '8px 0', fontSize: '13px', flex: 1 }}>Edit</button>
                 {b.status === 'start' && (
                   <button onClick={() => startReturn(b)} style={{ ...btnPrimary, padding: '8px 0', fontSize: '13px', background: '#f59e0b', flex: 1 }}>Close Trip</button>
+                )}
+                {isOwner && (
+                  <button onClick={() => handleDelete(b.id)} style={{ padding: '8px 0', fontSize: '13px', flex: 1, borderRadius: '8px', border: '1px solid #fca5a5', background: '#fee2e2', color: '#991b1b', cursor: 'pointer', fontWeight: '600' }}>Delete</button>
                 )}
               </div>
             </div>
@@ -873,10 +933,10 @@ export default function BookingSheet({ session, profile, setActivePage }) {
           <SectionTitle title="Payment Details" />
           <div className="br-grid-4">
             <Field label="Estimated Rent ₹">
-              <input type="number" value={form.rentAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
+              <input type="number" name="rentAmount" value={form.rentAmount} onChange={handleChange} style={{ ...input, background: '#f0f4ff' }} />
             </Field>
             <Field label="Security Deposit ₹">
-              <input type="number" value={selectedVehicle ? selectedVehicle.securityDeposit : ''} style={{ ...input, background: '#f0f4ff' }} readOnly />
+              <input type="number" name="securityDeposit" value={form.securityDeposit} onChange={handleChange} style={{ ...input, background: '#f0f4ff' }} />
             </Field>
             <Field label="Delivery Charges ₹">
               <input type="number" name="deliveryCharges" value={form.deliveryCharges} onChange={handleChange} style={input} placeholder="0" />
@@ -1009,6 +1069,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
           {(() => {
             const returningVehicle = vehicles.find(v => v.type === returningBooking.vehicle);
             const lateCharge = returningVehicle ? returningVehicle.lateChargePerHour : 0;
+            const rate1Day = returningVehicle ? (returningVehicle.rates['1 Day'] || 0) : 0;
             const showDamageField = ['Damage', 'Penalty'].includes(finalForm.reasonForDeduction);
             return (
               <>
@@ -1016,30 +1077,41 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                   <Field label="Extra Hours">
                     <input type="number" name="extraHours" value={finalForm.extraHours} onChange={handleFinalChange} style={input} placeholder="0" min="0" step="1" />
                   </Field>
-                  <Field label={`Extra Charge ₹ (@ ₹${lateCharge}/hr)`}>
-                    <input type="number" value={finalForm.extraCharge} style={{ ...input, background: '#fff7ed' }} readOnly />
+                  <Field label={`Extra Hours Charge ₹ (@ ₹${lateCharge}/hr)`}>
+                    <input type="number" name="extraHoursCharge" value={finalForm.extraHoursCharge} onChange={handleFinalChange} style={{ ...input, background: '#fff7ed' }} />
+                  </Field>
+                  <Field label="Extra Days">
+                    <input type="number" name="extraDays" value={finalForm.extraDays} onChange={handleFinalChange} style={input} placeholder="0" min="0" step="1" />
+                  </Field>
+                  <Field label={`Extra Days Charge ₹ (@ ₹${rate1Day}/day)`}>
+                    <input type="number" name="extraDaysCharge" value={finalForm.extraDaysCharge} onChange={handleFinalChange} style={{ ...input, background: '#fff7ed' }} />
+                  </Field>
+                </div>
+                <div className="br-grid-4">
+                  <Field label="Total Extra Charge ₹">
+                    <input type="number" name="totalExtraCharge" value={finalForm.totalExtraCharge} onChange={handleFinalChange} style={{ ...input, background: '#fff7ed' }} />
                   </Field>
                   <Field label="Actual Rent ₹">
-                    <input type="number" value={finalForm.rentAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
+                    <input type="number" name="rentAmount" value={finalForm.rentAmount} onChange={handleFinalChange} style={{ ...input, background: '#f0f4ff' }} />
                   </Field>
                   <Field label="Deduction ₹">
                     <input type="number" name="deduction" value={finalForm.deduction} onChange={handleFinalChange} style={input} placeholder="0" />
                   </Field>
-                </div>
-                <div className="br-grid-4">
                   <Field label="Reason For Deduction">
                     <select name="reasonForDeduction" value={finalForm.reasonForDeduction} onChange={handleFinalChange} style={input}>
                       <option value="">Select...</option>
                       {reasonForDeductionOptions.map(r => <option key={r}>{r}</option>)}
                     </select>
                   </Field>
+                </div>
+                <div className="br-grid-3">
                   {showDamageField && (
                     <Field label="Damage / Fine Description">
                       <textarea name="damagedFine" value={finalForm.damagedFine} onChange={handleFinalChange} style={{ ...input, resize: 'vertical', minHeight: '38px' }} placeholder="Describe damage or penalty..." />
                     </Field>
                   )}
                   <Field label="Refund Amount ₹">
-                    <input type="number" value={finalForm.refundAmount} style={{ ...input, background: '#f0f4ff' }} readOnly />
+                    <input type="number" name="refundAmount" value={finalForm.refundAmount} onChange={handleFinalChange} style={{ ...input, background: '#f0f4ff' }} />
                   </Field>
                 </div>
               </>
