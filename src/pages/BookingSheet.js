@@ -77,6 +77,79 @@ const emptyFinal = {
   refundAppPayment: '',
 };
 
+const EXPORT_COLUMNS = [
+  ['id', 'Booking ID'],
+  ['booking_date', 'Booking Date'],
+  ['booking_time', 'Booking Time'],
+  ['centre', 'Centre'],
+  ['customer_name', 'Customer Name'],
+  ['mobile', 'Mobile'],
+  ['vehicle', 'Vehicle'],
+  ['vehicle_number', 'Vehicle Number'],
+  ['booking_type', 'Booking Duration'],
+  ['expected_return', 'Expected Return'],
+  ['helmet', 'Helmet Given'],
+  ['start_km', 'Start KM'],
+  ['rent_amount', 'Estimated Rent'],
+  ['security_deposit', 'Security Deposit'],
+  ['delivery_charges', 'Delivery Charges'],
+  ['full_amount_received', 'Full Amount Received'],
+  ['cash', 'Cash'],
+  ['paid_to', 'Cash Paid To'],
+  ['upi_amount', 'UPI Amount'],
+  ['upi_paid_to', 'UPI Paid To'],
+  ['app_payment_amount', 'App Payment Amount'],
+  ['mode_of_payment', 'Mode of Payment (legacy)'],
+  ['credit_to', 'Credit To (legacy)'],
+  ['remarks', 'Remarks'],
+  ['status', 'Status'],
+  ['actual_return', 'Actual Return'],
+  ['end_km', 'End KM'],
+  ['km_driven', 'KM Driven'],
+  ['helmet_returned', 'Helmet Returned'],
+  ['extra_hours', 'Extra Hours'],
+  ['extra_charge', 'Extra Hours Charge'],
+  ['extra_days', 'Extra Days'],
+  ['extra_days_charge', 'Extra Days Charge'],
+  ['final_rent', 'Actual Rent'],
+  ['deduction', 'Deduction'],
+  ['reason_for_deduction', 'Reason For Deduction'],
+  ['damaged_fine', 'Damage / Fine Description'],
+  ['refund_amount', 'Refund Amount'],
+  ['refund_status', 'Refund Status'],
+  ['refund_cash', 'Refund Cash'],
+  ['refund_cash_by', 'Cash Refund By'],
+  ['refund_upi', 'Refund UPI'],
+  ['refund_upi_by', 'UPI Refund By'],
+  ['refund_app_payment', 'Refund App Payment'],
+  ['refund_by', 'Refund By (legacy)'],
+  ['created_at', 'Created At'],
+];
+
+function csvEscape(val) {
+  if (val === null || val === undefined) return '';
+  const s = String(val);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildCSV(rows) {
+  const header = EXPORT_COLUMNS.map(([, label]) => csvEscape(label)).join(',');
+  const lines = rows.map(row =>
+    EXPORT_COLUMNS.map(([field]) => csvEscape(row[field])).join(',')
+  );
+  return [header, ...lines].join('\r\n');
+}
+
+function downloadCSV(csvText, filename) {
+  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function BookingSheet({ session, profile, setActivePage }) {
   const [form, setForm] = useState(emptyForm);
   const [vehicles, setVehicles] = useState([]);
@@ -101,6 +174,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   const [activeOutBookings, setActiveOutBookings] = useState([]);
   const [activeSortColumn, setActiveSortColumn] = useState('');
   const [activeSortDir, setActiveSortDir] = useState('asc');
+  const [exportFrom, setExportFrom] = useState(getToday());
+  const [exportTo, setExportTo] = useState(getToday());
+  const [exporting, setExporting] = useState(false);
 
   const bookingsRef = useRef([]);
   const notifiedIds = useRef(new Set());
@@ -559,6 +635,31 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     }
     setBookings(prev => prev.filter(b => b.id !== bookingId));
     setActiveOutBookings(prev => prev.filter(b => b.id !== bookingId));
+  }
+
+  async function handleExportCSV() {
+    setExporting(true);
+    setError('');
+    let query = supabase.from('bookings').select('*')
+      .gte('booking_date', exportFrom)
+      .lte('booking_date', exportTo)
+      .order('booking_date', { ascending: true })
+      .order('booking_time', { ascending: true });
+    if (centreFilter !== 'all') query = query.eq('centre_id', centreIdByName[centreFilter]);
+    const { data, error } = await query;
+    if (error) {
+      setError('Export failed: ' + error.message);
+      setExporting(false);
+      return;
+    }
+    if (!data || data.length === 0) {
+      alert('No bookings found in that date range.');
+      setExporting(false);
+      return;
+    }
+    const csvText = buildCSV(data);
+    downloadCSV(csvText, `bookings_${exportFrom}_to_${exportTo}.csv`);
+    setExporting(false);
   }
 
   const effectivePaidToOptions = form.centre === 'IISER Bhouri' ? ['Banjara Ride'] : paidToOptions;
@@ -1266,6 +1367,24 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Export to CSV (super_admin only) */}
+        {isOwner && (
+          <>
+            <div className="br-filter-divider" style={{ width: '1px', background: '#e5e7eb', alignSelf: 'stretch', margin: '0 4px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Export Bookings (CSV)</label>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input type="date" value={exportFrom} onChange={e => setExportFrom(e.target.value)} style={{ ...input, width: '140px' }} />
+                <span style={{ color: '#888', fontSize: '12px' }}>to</span>
+                <input type="date" value={exportTo} onChange={e => setExportTo(e.target.value)} style={{ ...input, width: '140px' }} />
+                <button onClick={handleExportCSV} disabled={exporting} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '13px', opacity: exporting ? 0.7 : 1 }}>
+                  {exporting ? 'Exporting...' : 'Export'}
+                </button>
               </div>
             </div>
           </>

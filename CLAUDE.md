@@ -32,6 +32,7 @@
 - Phase 8a: Vehicle Master — "+ Add new type..." option in Vehicle Type dropdown; expands inline sub-section with name, deposit, late charge, all 13 rates (all required); two-step save (vehicle_type insert → vehicle insert)
 - Phase 8b: Booking list UX — filter bar + tables hidden while any form is open (formOpen = showForm || !!returningId); Active Bookings card (amber border) shows status='start' bookings from previous days above Today's Bookings; independent sort per section; hidden when empty or in search mode
 - Phase 9: Editable auto-filled fields (Rent Amount, Security Deposit, Extra Hours/Days Charge, Actual Rent, Refund Amount — all editable with guarded recalculation cascade); Extra Days field parallel to Extra Hours in close booking (extra_days, extra_days_charge DB columns; Total Extra Charge = Extra Hours Charge + Extra Days Charge); super_admin Delete button on every booking row (Today's + Active Bookings, desktop + mobile)
+- Phase 10: Date-range CSV export (super_admin only) — From/To date pickers + Export button in the filter bar; fresh date-range query independent of on-screen state; respects centre switcher; every active booking field (initial + close) as one column each, no new dependency (plain JS CSV building + Blob download)
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -179,6 +180,14 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Search box: searches ALL bookings (all dates) by mobile number or vehicle number (partial match)
 - Search and date filter are mutually exclusive
 - RLS transparently scopes search results to staff's own centre — no app-level centre filter needed
+
+## CSV Export (Phase 10, super_admin only)
+- From/To date pickers + Export button in the filter bar, visible only for super_admin
+- Independent Supabase query (`.gte('booking_date', from).lte('booking_date', to)`) — not limited to whatever's currently on screen
+- Respects the centre switcher: "All Centres" exports every centre in range; a specific centre tab exports only that centre
+- Every actively-used booking field (initial + close), one column each, raw values (not the merged/formatted strings the table displays) — includes legacy `mode_of_payment`/`credit_to`/`refund_by` since they hold real data on pre-Phase-7 bookings. Excludes `num_days`/`num_weeks` (confirmed empty, unused) and `centre_id` (redundant with `centre` name).
+- CSV built with plain JS (`csvEscape`/`buildCSV`) and downloaded via `Blob` + temporary `<a download>` — no new dependency, no `.xlsx` library
+- Empty date range shows an alert, does not download a broken file
 
 ## Return Reminders & Bell Icon
 - Checks every 60 seconds for active bookings with expected return ≤ 15 min
