@@ -435,6 +435,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
       if (updateError) setError('Failed to update booking: ' + updateError.message);
       else {
         setBookings(prev => prev.map(b => b.id === editingId ? data : b));
+        setActiveOutBookings(prev => prev.map(b => b.id === editingId ? data : b));
         setEditingId(null);
         setShowForm(false);
         setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre });

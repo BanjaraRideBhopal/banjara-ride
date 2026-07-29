@@ -263,4 +263,37 @@ Close Booking form now opens correctly for bookings from both Today's Bookings a
 
 ---
 
-*Last updated: 2026-07-21*
+## BUG-009 — Editing a booking from Active Bookings doesn't update the displayed row
+
+**Status:** Fixed
+**Found:** 2026-07-29
+**File:** `src/pages/BookingSheet.js`
+
+### What happened
+Editing a booking that appears in the Active Bookings section (a previous-day `status='start'` booking) saved correctly to the DB, but the row shown in Active Bookings still displayed the old, pre-edit values until a full page reload.
+
+### Root cause
+`handleSubmit`'s update branch only patched the `bookings` state:
+```js
+setBookings(prev => prev.map(b => b.id === editingId ? data : b));
+```
+A booking from Active Bookings lives in `activeOutBookings`, not `bookings` (`bookings` is scoped to the selected date filter, which defaults to today; Active Bookings are from previous days). The `.map()` over `bookings` found no matching id and was a no-op, so `activeOutBookings` never got the fresh `data` returned by the update.
+
+Same root cause class as BUG-008 (Phase 8b introduced a second booking-list state; a code path that only touches `bookings` silently misses rows that live in `activeOutBookings`), but on the edit-save path this time instead of the close path.
+
+### Fix
+```js
+setBookings(prev => prev.map(b => b.id === editingId ? data : b));
+setActiveOutBookings(prev => prev.map(b => b.id === editingId ? data : b));
+```
+Both state arrays are updated on every save; `.map()` is a no-op on whichever array doesn't contain the edited id, so this is safe to call unconditionally regardless of which section the booking came from.
+
+### Why it occurred
+Same lesson as BUG-008: any code path that mutates a booking by id must update **both** `bookings` and `activeOutBookings`, not just one. `handleFinalSubmit` (close booking) already did this correctly; `handleSubmit` (plain edit) did not.
+
+### Flow impact
+Editing a booking from Active Bookings now updates the displayed row immediately, matching the existing behavior for edits from Today's Bookings.
+
+---
+
+*Last updated: 2026-07-29*
