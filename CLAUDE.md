@@ -90,7 +90,7 @@
 
 ### maintenance_expenses / insurance_records / battery_records (Phase 11)
 - All 3: `id BIGSERIAL PK`, `vehicle_id BIGINT NOT NULL FK → vehicles`, `centre_id BIGINT NOT NULL FK → centres`, `created_at TIMESTAMPTZ DEFAULT now()`. Append-only — no UPDATE/DELETE policy, no edit/delete feature.
-- `maintenance_expenses`: `expense_date DATE`, `expense_type TEXT` ('Fuel'/'Parts'/'Labour'/'Other'), `amount NUMERIC`, `description TEXT` (optional)
+- `maintenance_expenses`: `expense_date DATE`, `expense_type TEXT` ('Fuel'/'Parts'/'Labour'/'Insurance'/'Battery'/'Other'), `amount NUMERIC`, `description TEXT` (optional)
 - `insurance_records`: `last_renewed DATE`, `next_due DATE`, `notes TEXT` (optional). Latest-per-vehicle = row with max `created_at`.
 - `battery_records`: `replaced_date DATE`, `next_due DATE` (optional, plain data field only — no badge/bell alert, unlike insurance), `notes TEXT` (optional)
 - `centre_id` on insert = the vehicle's own `centre_id` (`selectedVehicle.centre_id`), same value for staff and super_admin — not the logged-in user's own centre

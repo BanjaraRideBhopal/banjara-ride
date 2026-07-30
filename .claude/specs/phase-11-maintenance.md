@@ -24,6 +24,11 @@ Owner tested again in browser, reported 3 more issues, all fixed:
 2. **Insurance badge label appearing in the Vehicle Number dropdown** ("MP04YS5213 — OK") was confusing/unwanted. Removed entirely — the Vehicle Number dropdown now shows only the registration number, no status suffix. (Insurance status is still visible via the badge once a vehicle is selected and its detail view opens.)
 3. **Notes not visible for insurance records, and history not shown as a table.** All 3 history sections (Expenses, Insurance, Battery) were plain flex-row lists, and Insurance's "history" list only rendered rows *after* the first one (`.slice(1)`) — so a vehicle with only one insurance record never showed its own notes anywhere, since the "latest record" summary line never included notes and the "history" section skipped it. Fixed by converting all 3 sections to real `<table>` markup (same plain inline-styled `<table>`/`th`/`td` pattern already used in `VehicleMaster.js`, not the heavyweight `desktop-table`/`mobile-cards` booking-table CSS) that lists **every** record including the latest, so notes are always visible regardless of how many records exist. Insurance keeps its prominent Last Renewed / Next Due / badge summary line above the table for at-a-glance status; Battery dropped the redundant summary line entirely since it has no badge/status concept (owner's earlier explicit scope decision) — the table's top row already shows the latest replacement.
 
+## Third round of post-ship fixes (2026-07-30)
+
+1. **Expense Type dropdown missing Insurance/Battery.** Added both alongside the original Fuel/Parts/Labour/Other, so staff can log insurance/battery-related costs directly as an expense line if needed, separate from the dedicated Insurance Status / Battery Status sections.
+2. **Test data cleanup.** Owner had added test maintenance/insurance/battery records for MP04YS5213 (Pulsar 125, vehicle id 47) while trying out the feature. Deleted all 3 records (2 expenses, 1 insurance, 1 battery) directly via SQL — confirmed 0 remaining rows for that vehicle across all 3 tables.
+
 ---
 
 ## Implementation Notes (2026-07-29)
