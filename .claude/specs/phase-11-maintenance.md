@@ -16,6 +16,14 @@ Owner tested in browser and reported 3 issues, all fixed:
 
 Also corrected in passing: `CLAUDE.md`/`CLAUDE_HANDOFF.md` said IISER Bhouri had 0 vehicles — live query showed it actually has 1 (`MP04SQ7201`, Access 125), added at some point after the last memory snapshot. Docs corrected to 53 total vehicles (52 Sonagiri + 1 IISER).
 
+## Second round of post-ship fixes (2026-07-30)
+
+Owner tested again in browser, reported 3 more issues, all fixed:
+
+1. **Insurance badge label unclear.** "OK" (green, next_due > 7 days out) read as ambiguous out of context. Renamed to "Valid" — "Due Soon" and "Overdue" left unchanged (already self-explanatory).
+2. **Insurance badge label appearing in the Vehicle Number dropdown** ("MP04YS5213 — OK") was confusing/unwanted. Removed entirely — the Vehicle Number dropdown now shows only the registration number, no status suffix. (Insurance status is still visible via the badge once a vehicle is selected and its detail view opens.)
+3. **Notes not visible for insurance records, and history not shown as a table.** All 3 history sections (Expenses, Insurance, Battery) were plain flex-row lists, and Insurance's "history" list only rendered rows *after* the first one (`.slice(1)`) — so a vehicle with only one insurance record never showed its own notes anywhere, since the "latest record" summary line never included notes and the "history" section skipped it. Fixed by converting all 3 sections to real `<table>` markup (same plain inline-styled `<table>`/`th`/`td` pattern already used in `VehicleMaster.js`, not the heavyweight `desktop-table`/`mobile-cards` booking-table CSS) that lists **every** record including the latest, so notes are always visible regardless of how many records exist. Insurance keeps its prominent Last Renewed / Next Due / badge summary line above the table for at-a-glance status; Battery dropped the redundant summary line entirely since it has no badge/status concept (owner's earlier explicit scope decision) — the table's top row already shows the latest replacement.
+
 ---
 
 ## Implementation Notes (2026-07-29)

@@ -103,7 +103,7 @@ export default function Maintenance({ profile, setActivePage }) {
     const today = getToday();
     if (rec.next_due < today) return { label: 'Overdue', bg: '#fee2e2', color: '#991b1b' };
     if (rec.next_due <= addDays(today, 7)) return { label: 'Due Soon', bg: '#fef3c7', color: '#92400e' };
-    return { label: 'OK', bg: '#d1fae5', color: '#065f46' };
+    return { label: 'Valid', bg: '#d1fae5', color: '#065f46' };
   }
 
   async function saveExpense() {
@@ -271,7 +271,7 @@ export default function Maintenance({ profile, setActivePage }) {
                 >
                   <option value="">Select...</option>
                   {vehiclesOfSelectedType.map(v => (
-                    <option key={v.id} value={v.id}>{v.registration_number} — {insuranceBadge(v.id).label}</option>
+                    <option key={v.id} value={v.id}>{v.registration_number}</option>
                   ))}
                 </select>
               </Field>
@@ -293,15 +293,27 @@ export default function Maintenance({ profile, setActivePage }) {
           {expenses.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px', marginBottom: '12px' }}>No expenses logged yet.</p>
           ) : (
-            <div style={{ marginBottom: '12px' }}>
-              {expenses.map(e => (
-                <div key={e.id} style={rowStyle}>
-                  <span style={{ fontWeight: '600' }}>{e.expense_date}</span>
-                  <span>{e.expense_type}</span>
-                  <span>₹{e.amount}</span>
-                  <span style={{ color: '#666' }}>{e.description || '—'}</span>
-                </div>
-              ))}
+            <div style={{ overflowX: 'auto', marginBottom: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Date</th>
+                    <th style={th}>Type</th>
+                    <th style={th}>Amount ₹</th>
+                    <th style={th}>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map(e => (
+                    <tr key={e.id}>
+                      <td style={td}>{e.expense_date}</td>
+                      <td style={td}>{e.expense_type}</td>
+                      <td style={td}>₹{e.amount}</td>
+                      <td style={td}>{e.description || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           {showExpenseForm && (
@@ -348,15 +360,26 @@ export default function Maintenance({ profile, setActivePage }) {
           ) : (
             <p style={{ color: '#999', fontSize: '13px', marginBottom: '12px' }}>No insurance record yet.</p>
           )}
-          {insuranceHistory.length > 1 && (
-            <div style={{ marginBottom: '12px' }}>
-              {insuranceHistory.slice(1).map(r => (
-                <div key={r.id} style={rowStyle}>
-                  <span>{r.last_renewed}</span>
-                  <span>→ {r.next_due}</span>
-                  <span style={{ color: '#666' }}>{r.notes || '—'}</span>
-                </div>
-              ))}
+          {insuranceHistory.length > 0 && (
+            <div style={{ overflowX: 'auto', marginBottom: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Last Renewed</th>
+                    <th style={th}>Next Due</th>
+                    <th style={th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insuranceHistory.map(r => (
+                    <tr key={r.id}>
+                      <td style={td}>{r.last_renewed}</td>
+                      <td style={td}>{r.next_due}</td>
+                      <td style={td}>{r.notes || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           {showInsuranceForm && (
@@ -385,24 +408,28 @@ export default function Maintenance({ profile, setActivePage }) {
 
           {/* C — BATTERY STATUS */}
           <SectionTitle title="Battery Status" />
-          {batteryHistory.length > 0 ? (
-            <div style={{ ...rowStyle, marginBottom: '8px', fontWeight: '600' }}>
-              <span>Last Replaced: {batteryHistory[0].replaced_date}</span>
-              {batteryHistory[0].next_due && <span>Next Due: {batteryHistory[0].next_due}</span>}
-              <span style={{ color: '#666', fontWeight: '400' }}>{batteryHistory[0].notes || ''}</span>
-            </div>
-          ) : (
+          {batteryHistory.length === 0 ? (
             <p style={{ color: '#999', fontSize: '13px', marginBottom: '12px' }}>No battery record yet.</p>
-          )}
-          {batteryHistory.length > 1 && (
-            <div style={{ marginBottom: '12px' }}>
-              {batteryHistory.slice(1).map(r => (
-                <div key={r.id} style={rowStyle}>
-                  <span>{r.replaced_date}</span>
-                  {r.next_due && <span>→ {r.next_due}</span>}
-                  <span style={{ color: '#666' }}>{r.notes || '—'}</span>
-                </div>
-              ))}
+          ) : (
+            <div style={{ overflowX: 'auto', marginBottom: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Replaced Date</th>
+                    <th style={th}>Next Due</th>
+                    <th style={th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batteryHistory.map(r => (
+                    <tr key={r.id}>
+                      <td style={td}>{r.replaced_date}</td>
+                      <td style={td}>{r.next_due || '—'}</td>
+                      <td style={td}>{r.notes || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           {showBatteryForm && (
@@ -453,5 +480,7 @@ function Field({ label, children }) {
 
 const input = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', width: '100%', outline: 'none' };
 const rowStyle = { display: 'flex', gap: '16px', padding: '8px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px', color: '#333', flexWrap: 'wrap' };
+const th = { padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: '#1a56a0', fontSize: '12px', borderBottom: '2px solid #e0e8f0', whiteSpace: 'nowrap' };
+const td = { padding: '8px 10px', fontSize: '13px', color: '#333', borderBottom: '1px solid #f0f0f0' };
 const btnPrimary = { background: '#1a56a0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' };
 const btnSecondary = { padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', cursor: 'pointer', fontSize: '14px' };
