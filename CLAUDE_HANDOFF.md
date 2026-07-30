@@ -28,9 +28,9 @@
 
 | # | Centre | Type | Notes |
 |---|---|---|---|
-| 1 | Sonagiri | company | 52 vehicles seeded |
-| 2 | Rani Kamlapati Station | company | 0 vehicles — assign in Vehicle Master |
-| 3 | IISER Bhouri | franchise | fully isolated, 0 vehicles |
+| 1 | Sonagiri | company | 52 vehicles |
+| 2 | Rani Kamlapati Station | company | 0 vehicles registered directly — shares Sonagiri's fleet via group RLS |
+| 3 | IISER Bhouri | franchise | fully isolated, 1 vehicle (as of 2026-07-29) |
 
 Sonagiri + Rani Kamlapati share vehicle fleet and customer pool via group-based RLS. IISER is fully isolated from both.
 

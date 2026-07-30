@@ -4,6 +4,20 @@
 
 ---
 
+## Post-ship fixes (2026-07-29, same day as initial ship)
+
+Owner tested in browser and reported 3 issues, all fixed:
+
+1. **Rani Kamlapati Station showed 0 vehicles (bug).** The original centre switcher used literal tabs "Sonagiri" / "Rani Kamlapati Station" / "IISER Bhouri" with `.eq('centre_id', ...)` filtering — but all 52 company vehicles are registered under Sonagiri's literal `centre_id`; none are registered to Rani Kamlapati's. Since the RLS (and `vehicles`/`customers` generally) treat Sonagiri + Rani Kamlapati as one shared group, a literal per-centre filter was wrong for this data model. **Fix:** centre switcher rebuilt to load `centres` (with `is_franchise`) directly and offer "All Centres" / "Company Owned" (`.in('centre_id', companyCentreIds)`) / one tab per franchise centre — mirrors `VehicleMaster.js`'s existing "Company Owned" grouping exactly. No more separate Sonagiri/Rani Kamlapati tabs, since they were never going to show different data under the group-sharing model.
+
+2. **Vehicle list clutter.** Originally rendered every vehicle at the filtered centre as a clickable tile (up to 52+ at once). **Fix:** replaced with a Vehicle Type dropdown → Vehicle Number dropdown cascade, same UX pattern as the booking form's Vehicle/Vehicle Number selection. Insurance status label shown inline in each `<option>` text (e.g. "MP04XX1234 — Overdue").
+
+3. **Battery Replacement needed a Next Due date.** Added `next_due DATE` (nullable) to `battery_records` via migration, form field added to the inline Battery Replacement form. Owner confirmed (2026-07-29): optional field, plain data capture only — no status badge, no bell/nav-badge alert (unlike Insurance's `next_due`, which does drive alerts). Scope deliberately kept narrow to what was asked.
+
+Also corrected in passing: `CLAUDE.md`/`CLAUDE_HANDOFF.md` said IISER Bhouri had 0 vehicles — live query showed it actually has 1 (`MP04SQ7201`, Access 125), added at some point after the last memory snapshot. Docs corrected to 53 total vehicles (52 Sonagiri + 1 IISER).
+
+---
+
 ## Implementation Notes (2026-07-29)
 
 **Two deviations from the spec's original §3.4/§6 wording, both discussed and approved by owner before running any SQL:**

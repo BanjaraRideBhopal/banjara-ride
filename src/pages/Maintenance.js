@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { centreOptions } from '../data/options';
 
 function getToday() {
   const d = new Date();
@@ -20,15 +19,16 @@ const expenseTypeOptions = ['Fuel', 'Parts', 'Labour', 'Other'];
 
 const emptyExpenseForm = { expense_date: getToday(), expense_type: '', amount: '', description: '' };
 const emptyInsuranceForm = { last_renewed: '', next_due: '', notes: '' };
-const emptyBatteryForm = { replaced_date: getToday(), notes: '' };
+const emptyBatteryForm = { replaced_date: getToday(), next_due: '', notes: '' };
 
 export default function Maintenance({ profile, setActivePage }) {
   const isOwner = profile?.role === 'super_admin';
 
   const [vehicles, setVehicles] = useState([]);
-  const [centreIdByName, setCentreIdByName] = useState({});
+  const [centres, setCentres] = useState([]);
   const [centreFilter, setCentreFilter] = useState('all');
   const [insuranceByVehicle, setInsuranceByVehicle] = useState({});
+  const [selectedVehicleType, setSelectedVehicleType] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
 
   const [expenses, setExpenses] = useState([]);
@@ -46,6 +46,10 @@ export default function Maintenance({ profile, setActivePage }) {
   const [error, setError] = useState('');
 
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+  const companyCentreIds = centres.filter(c => !c.is_franchise).map(c => c.id);
+  const franchiseCentres = centres.filter(c => c.is_franchise);
+  const vehicleTypeNames = Array.from(new Set(vehicles.map(v => v.vehicle_types?.name).filter(Boolean))).sort();
+  const vehiclesOfSelectedType = vehicles.filter(v => v.vehicle_types?.name === selectedVehicleType);
 
   useEffect(() => {
     loadCentres();
@@ -54,13 +58,14 @@ export default function Maintenance({ profile, setActivePage }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadCentres() {
-    const { data } = await supabase.from('centres').select('id, name');
-    setCentreIdByName(Object.fromEntries((data || []).map(c => [c.name, c.id])));
+    const { data } = await supabase.from('centres').select('id, name, is_franchise');
+    setCentres(data || []);
   }
 
   async function loadVehicles(cf = centreFilter) {
     let query = supabase.from('vehicles').select('*, vehicle_types(name)').eq('active', true).order('registration_number');
-    if (isOwner && cf !== 'all') query = query.eq('centre_id', centreIdByName[cf]);
+    if (isOwner && cf === 'company') query = query.in('centre_id', companyCentreIds);
+    else if (isOwner && cf !== 'all') query = query.eq('centre_id', cf);
     const { data } = await query;
     setVehicles(data || []);
   }
@@ -162,6 +167,7 @@ export default function Maintenance({ profile, setActivePage }) {
       vehicle_id: selectedVehicle.id,
       centre_id,
       replaced_date: batteryForm.replaced_date,
+      next_due: batteryForm.next_due || null,
       notes: batteryForm.notes || null,
     });
     if (err) setError('Failed to save battery record: ' + err.message);
@@ -207,46 +213,69 @@ export default function Maintenance({ profile, setActivePage }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <label style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Centre</label>
             <div className="br-centre-tabs">
-              {['All Centres', ...centreOptions].map(c => {
-                const val = c === 'All Centres' ? 'all' : c;
-                return (
-                  <button
-                    key={c}
-                    className={`br-centre-tab${centreFilter === val ? ' active' : ''}`}
-                    onClick={() => { setCentreFilter(val); loadVehicles(val); setSelectedVehicleId(null); }}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
+              <button
+                className={`br-centre-tab${centreFilter === 'all' ? ' active' : ''}`}
+                onClick={() => { setCentreFilter('all'); loadVehicles('all'); setSelectedVehicleType(''); setSelectedVehicleId(null); }}
+              >
+                All Centres
+              </button>
+              {companyCentreIds.length > 0 && (
+                <button
+                  className={`br-centre-tab${centreFilter === 'company' ? ' active' : ''}`}
+                  onClick={() => { setCentreFilter('company'); loadVehicles('company'); setSelectedVehicleType(''); setSelectedVehicleId(null); }}
+                >
+                  Company Owned
+                </button>
+              )}
+              {franchiseCentres.map(c => (
+                <button
+                  key={c.id}
+                  className={`br-centre-tab${centreFilter === c.id ? ' active' : ''}`}
+                  onClick={() => { setCentreFilter(c.id); loadVehicles(c.id); setSelectedVehicleType(''); setSelectedVehicleId(null); }}
+                >
+                  {c.name}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* VEHICLE LIST */}
+      {/* VEHICLE LIST — Type then Number, to avoid listing all vehicles at once */}
       <div className="br-form-card">
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>Vehicles ({vehicles.length})</h2>
         {vehicles.length === 0 ? (
           <p style={{ color: '#999', textAlign: 'center', padding: '40px' }}>No vehicles at this centre yet.</p>
         ) : (
-          <div className="br-centre-tabs">
-            {vehicles.map(v => {
-              const badge = insuranceBadge(v.id);
-              return (
-                <button
-                  key={v.id}
-                  className={`br-centre-tab${selectedVehicleId === v.id ? ' active' : ''}`}
-                  onClick={() => selectVehicle(v)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          <div className="br-grid-2">
+            <Field label="Vehicle Type">
+              <select
+                value={selectedVehicleType}
+                onChange={e => { setSelectedVehicleType(e.target.value); setSelectedVehicleId(null); }}
+                style={input}
+              >
+                <option value="">Select...</option>
+                {vehicleTypeNames.map(name => <option key={name}>{name}</option>)}
+              </select>
+            </Field>
+            {selectedVehicleType && (
+              <Field label="Vehicle Number">
+                <select
+                  value={selectedVehicleId || ''}
+                  onChange={e => {
+                    const v = vehiclesOfSelectedType.find(x => String(x.id) === e.target.value);
+                    if (v) selectVehicle(v);
+                    else setSelectedVehicleId(null);
+                  }}
+                  style={input}
                 >
-                  {v.registration_number} ({v.vehicle_types?.name || '—'})
-                  <span style={{ padding: '1px 7px', borderRadius: '10px', fontSize: '10px', fontWeight: '700', background: badge.bg, color: badge.color }}>
-                    {badge.label}
-                  </span>
-                </button>
-              );
-            })}
+                  <option value="">Select...</option>
+                  {vehiclesOfSelectedType.map(v => (
+                    <option key={v.id} value={v.id}>{v.registration_number} — {insuranceBadge(v.id).label}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
         )}
       </div>
@@ -359,6 +388,7 @@ export default function Maintenance({ profile, setActivePage }) {
           {batteryHistory.length > 0 ? (
             <div style={{ ...rowStyle, marginBottom: '8px', fontWeight: '600' }}>
               <span>Last Replaced: {batteryHistory[0].replaced_date}</span>
+              {batteryHistory[0].next_due && <span>Next Due: {batteryHistory[0].next_due}</span>}
               <span style={{ color: '#666', fontWeight: '400' }}>{batteryHistory[0].notes || ''}</span>
             </div>
           ) : (
@@ -369,15 +399,19 @@ export default function Maintenance({ profile, setActivePage }) {
               {batteryHistory.slice(1).map(r => (
                 <div key={r.id} style={rowStyle}>
                   <span>{r.replaced_date}</span>
+                  {r.next_due && <span>→ {r.next_due}</span>}
                   <span style={{ color: '#666' }}>{r.notes || '—'}</span>
                 </div>
               ))}
             </div>
           )}
           {showBatteryForm && (
-            <div className="br-grid-2" style={{ marginBottom: '12px' }}>
+            <div className="br-grid-3" style={{ marginBottom: '12px' }}>
               <Field label="Replaced Date">
                 <input type="date" value={batteryForm.replaced_date} onChange={e => setBatteryForm(p => ({ ...p, replaced_date: e.target.value }))} style={input} />
+              </Field>
+              <Field label="Next Due">
+                <input type="date" value={batteryForm.next_due} onChange={e => setBatteryForm(p => ({ ...p, next_due: e.target.value }))} style={input} />
               </Field>
               <Field label="Notes">
                 <input type="text" value={batteryForm.notes} onChange={e => setBatteryForm(p => ({ ...p, notes: e.target.value }))} style={input} placeholder="Optional" />

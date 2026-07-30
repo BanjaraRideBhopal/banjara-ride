@@ -34,6 +34,9 @@
 - Phase 9: Editable auto-filled fields (Rent Amount, Security Deposit, Extra Hours/Days Charge, Actual Rent, Refund Amount — all editable with guarded recalculation cascade); Extra Days field parallel to Extra Hours in close booking (extra_days, extra_days_charge DB columns; Total Extra Charge = Extra Hours Charge + Extra Days Charge); super_admin Delete button on every booking row (Today's + Active Bookings, desktop + mobile)
 - Phase 10: Date-range CSV export (super_admin only) — From/To date pickers + Export button in the filter bar; fresh date-range query independent of on-screen state; respects centre switcher; every active booking field (initial + close) as one column each, no new dependency (plain JS CSV building + Blob download)
 - Phase 11: Vehicle Maintenance page (`src/pages/Maintenance.js`) — accessible to all logged-in users; vehicle list with insurance status badge (green/amber/red), 3 sections per vehicle (Maintenance Expenses, Insurance Status, Battery Status), each append-only (latest record + full history + inline add form); `App.js` routes `activePage === 'maintenance'`; `BookingSheet.js` header has a Maintenance nav link with a red badge (insurance due ≤7 days), and the bell dropdown shows an Insurance Due section below return reminders. 3 new tables (`maintenance_expenses`, `insurance_records`, `battery_records`) — RLS mirrors `vehicles`' group-sharing pattern (company centres share, franchise isolated), not simple per-centre isolation, so Sonagiri/Rani Kamlapati share maintenance history for shared vehicles. `centre_id` on every insert = the vehicle's own `centre_id`, not the logged-in user's.
+  - Post-ship fix (2026-07-29): centre switcher rebuilt to match `vehicles`' actual grouping — "All Centres" / "Company Owned" / one tab per franchise centre (loaded live from `centres` table), replacing the original literal Sonagiri/Rani Kamlapati/IISER tabs which incorrectly showed 0 vehicles for Rani Kamlapati (all 52 are literally registered to Sonagiri; Rani Kamlapati only sees them via group sharing).
+  - Post-ship fix: vehicle list changed from a flat list of all vehicle tiles to a Vehicle Type dropdown → Vehicle Number dropdown cascade (same pattern as the booking form), to avoid listing 50+ vehicles at once.
+  - Post-ship addition: `battery_records` gained an optional `next_due DATE` column + form field — plain data capture only, no badge or bell alert (unlike insurance's next_due).
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -77,7 +80,7 @@
 
 ### vehicles (registrations)
 - id, registration_number, vehicle_type_id FK → vehicle_types, centre_id FK → centres, active BOOL
-- 52 rows seeded — all currently assigned to Sonagiri; Rani Kamlapati + IISER have 0
+- 53 rows (as of 2026-07-29): 52 at Sonagiri, 1 at IISER Bhouri (MP04SQ7201, Access 125), 0 at Rani Kamlapati (shares Sonagiri's fleet via group RLS)
 
 ### customers
 - id (BIGSERIAL PK — surrogate), mobile TEXT, name TEXT, centre_id INT FK → centres (kept for reference only), created_at
@@ -89,7 +92,7 @@
 - All 3: `id BIGSERIAL PK`, `vehicle_id BIGINT NOT NULL FK → vehicles`, `centre_id BIGINT NOT NULL FK → centres`, `created_at TIMESTAMPTZ DEFAULT now()`. Append-only — no UPDATE/DELETE policy, no edit/delete feature.
 - `maintenance_expenses`: `expense_date DATE`, `expense_type TEXT` ('Fuel'/'Parts'/'Labour'/'Other'), `amount NUMERIC`, `description TEXT` (optional)
 - `insurance_records`: `last_renewed DATE`, `next_due DATE`, `notes TEXT` (optional). Latest-per-vehicle = row with max `created_at`.
-- `battery_records`: `replaced_date DATE`, `notes TEXT` (optional)
+- `battery_records`: `replaced_date DATE`, `next_due DATE` (optional, plain data field only — no badge/bell alert, unlike insurance), `notes TEXT` (optional)
 - `centre_id` on insert = the vehicle's own `centre_id` (`selectedVehicle.centre_id`), same value for staff and super_admin — not the logged-in user's own centre
 
 ### bookings
