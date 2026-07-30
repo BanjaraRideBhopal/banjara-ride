@@ -24,6 +24,12 @@ function getToday() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function addDays(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+}
+
 const emptyForm = {
   bookingDate: getToday(),
   bookingTime: getCurrentTime12hr(),
@@ -177,6 +183,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   const [exportFrom, setExportFrom] = useState(getToday());
   const [exportTo, setExportTo] = useState(getToday());
   const [exporting, setExporting] = useState(false);
+  const [insuranceDue, setInsuranceDue] = useState([]);
 
   const bookingsRef = useRef([]);
   const notifiedIds = useRef(new Set());
@@ -189,6 +196,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   const returningBooking = bookings.find(b => b.id === returningId) || activeOutBookings.find(b => b.id === returningId);
 
   const visibleApproaching = approachingReturns.filter(b => !dismissedBannerIds.current.has(b.id));
+  const insuranceDueCount = insuranceDue.length;
+  const bellCount = approachingReturns.length + insuranceDueCount;
   const activeBookings = bookings
     .filter(b => b.status === 'start')
     .sort((a, b) => {
@@ -220,9 +229,24 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    const interval = setInterval(checkApproachingReturns, 60000);
+    checkInsuranceDue();
+    const interval = setInterval(() => { checkApproachingReturns(); checkInsuranceDue(); }, 60000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function checkInsuranceDue() {
+    const { data } = await supabase
+      .from('insurance_records')
+      .select('id, vehicle_id, next_due, created_at, vehicles(registration_number, vehicle_types(name))')
+      .order('created_at', { ascending: false });
+    const latestByVehicle = {};
+    (data || []).forEach(r => { if (!latestByVehicle[r.vehicle_id]) latestByVehicle[r.vehicle_id] = r; });
+    const dueIn7 = addDays(getToday(), 7);
+    const due = Object.values(latestByVehicle)
+      .filter(r => r.next_due <= dueIn7)
+      .sort((a, b) => a.next_due.localeCompare(b.next_due));
+    setInsuranceDue(due);
+  }
 
   async function loadVehiclesAndCentres() {
     const [{ data: types }, { data: regs }, { data: centres }] = await Promise.all([
@@ -857,13 +881,13 @@ export default function BookingSheet({ session, profile, setActivePage }) {
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowBell(v => !v)}
-              style={{ position: 'relative', background: approachingReturns.length > 0 ? '#fef3c7' : '#f3f4f6', border: '1px solid ' + (approachingReturns.length > 0 ? '#f59e0b' : '#ddd'), borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}
-              title="Return reminders"
+              style={{ position: 'relative', background: bellCount > 0 ? '#fef3c7' : '#f3f4f6', border: '1px solid ' + (bellCount > 0 ? '#f59e0b' : '#ddd'), borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}
+              title="Return & insurance reminders"
             >
               🔔
-              {approachingReturns.length > 0 && (
+              {bellCount > 0 && (
                 <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#dc2626', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {approachingReturns.length}
+                  {bellCount}
                 </span>
               )}
             </button>
@@ -897,10 +921,41 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                       );
                     })
                   )}
+                  {insuranceDue.length > 0 && (
+                    <>
+                      <div style={{ fontWeight: '700', color: '#1a56a0', margin: '14px 0 8px', fontSize: '14px', borderTop: '1px solid #f0f0f0', paddingTop: '12px' }}>Insurance Due</div>
+                      {insuranceDue.map(r => {
+                        const isOverdue = r.next_due < getToday();
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => { setShowBell(false); setActivePage('maintenance'); }}
+                            style={{ padding: '8px 0', borderTop: '1px solid #f0f0f0', fontSize: '13px', cursor: 'pointer' }}
+                          >
+                            <div style={{ fontWeight: '600', color: isOverdue ? '#dc2626' : '#92400e' }}>
+                              🛡 {r.vehicles?.registration_number} ({r.vehicles?.vehicle_types?.name || '—'})
+                            </div>
+                            <div style={{ color: '#666', fontSize: '12px', marginTop: '2px' }}>
+                              {isOverdue ? <span style={{ color: '#dc2626', fontWeight: '600' }}>OVERDUE</span> : `due ${r.next_due}`}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               </>
             )}
           </div>
+
+          <button onClick={() => setActivePage('maintenance')} style={{ ...btnSecondary, position: 'relative' }}>
+            Maintenance
+            {insuranceDueCount > 0 && (
+              <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#dc2626', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {insuranceDueCount}
+              </span>
+            )}
+          </button>
 
           {isOwner && (
             <button onClick={() => setActivePage('vehicles')} style={btnSecondary}>

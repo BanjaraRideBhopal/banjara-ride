@@ -33,6 +33,7 @@
 - Phase 8b: Booking list UX — filter bar + tables hidden while any form is open (formOpen = showForm || !!returningId); Active Bookings card (amber border) shows status='start' bookings from previous days above Today's Bookings; independent sort per section; hidden when empty or in search mode
 - Phase 9: Editable auto-filled fields (Rent Amount, Security Deposit, Extra Hours/Days Charge, Actual Rent, Refund Amount — all editable with guarded recalculation cascade); Extra Days field parallel to Extra Hours in close booking (extra_days, extra_days_charge DB columns; Total Extra Charge = Extra Hours Charge + Extra Days Charge); super_admin Delete button on every booking row (Today's + Active Bookings, desktop + mobile)
 - Phase 10: Date-range CSV export (super_admin only) — From/To date pickers + Export button in the filter bar; fresh date-range query independent of on-screen state; respects centre switcher; every active booking field (initial + close) as one column each, no new dependency (plain JS CSV building + Blob download)
+- Phase 11: Vehicle Maintenance page (`src/pages/Maintenance.js`) — accessible to all logged-in users; vehicle list with insurance status badge (green/amber/red), 3 sections per vehicle (Maintenance Expenses, Insurance Status, Battery Status), each append-only (latest record + full history + inline add form); `App.js` routes `activePage === 'maintenance'`; `BookingSheet.js` header has a Maintenance nav link with a red badge (insurance due ≤7 days), and the bell dropdown shows an Insurance Due section below return reminders. 3 new tables (`maintenance_expenses`, `insurance_records`, `battery_records`) — RLS mirrors `vehicles`' group-sharing pattern (company centres share, franchise isolated), not simple per-centre isolation, so Sonagiri/Rani Kamlapati share maintenance history for shared vehicles. `centre_id` on every insert = the vehicle's own `centre_id`, not the logged-in user's.
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -84,6 +85,13 @@
 - Upsert target: onConflict 'mobile', no centre_id in payload
 - Lookup: .eq('mobile').maybeSingle() — no centre filter; RLS fully open to all authenticated
 
+### maintenance_expenses / insurance_records / battery_records (Phase 11)
+- All 3: `id BIGSERIAL PK`, `vehicle_id BIGINT NOT NULL FK → vehicles`, `centre_id BIGINT NOT NULL FK → centres`, `created_at TIMESTAMPTZ DEFAULT now()`. Append-only — no UPDATE/DELETE policy, no edit/delete feature.
+- `maintenance_expenses`: `expense_date DATE`, `expense_type TEXT` ('Fuel'/'Parts'/'Labour'/'Other'), `amount NUMERIC`, `description TEXT` (optional)
+- `insurance_records`: `last_renewed DATE`, `next_due DATE`, `notes TEXT` (optional). Latest-per-vehicle = row with max `created_at`.
+- `battery_records`: `replaced_date DATE`, `notes TEXT` (optional)
+- `centre_id` on insert = the vehicle's own `centre_id` (`selectedVehicle.centre_id`), same value for staff and super_admin — not the logged-in user's own centre
+
 ### bookings
 - id (BIGINT PK, uses Date.now()), mobile, customer_name, booking_date, booking_time, booking_type
 - centre (TEXT name), centre_id (INT FK → centres) NOT NULL
@@ -101,6 +109,7 @@
 - vehicles: company staff see all company-centre vehicles; franchise (IISER) see only own; super_admin can write
 - vehicle_types + centres: all authenticated can select; super_admin can write
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
+- maintenance_expenses / insurance_records / battery_records (Phase 11): SELECT + INSERT mirror `vehicles`' group-sharing logic — company staff see/write all company-centre records regardless of which company centre logged them; franchise (IISER) staff see/write only their own centre; super_admin all. No UPDATE/DELETE policy (append-only). No explicit anon-deny policy needed — RLS enabled + zero anon policies already default-denies, same as bookings/vehicles.
 
 ## Vehicles (21 types, 10 rate groups)
 Vehicle data is now loaded from the `vehicle_types` + `vehicles` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
