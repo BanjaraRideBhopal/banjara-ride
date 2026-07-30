@@ -37,12 +37,15 @@
   - Post-ship fix (2026-07-29): centre switcher rebuilt to match `vehicles`' actual grouping — "All Centres" / "Company Owned" / one tab per franchise centre (loaded live from `centres` table), replacing the original literal Sonagiri/Rani Kamlapati/IISER tabs which incorrectly showed 0 vehicles for Rani Kamlapati (all 52 are literally registered to Sonagiri; Rani Kamlapati only sees them via group sharing).
   - Post-ship fix: vehicle list changed from a flat list of all vehicle tiles to a Vehicle Type dropdown → Vehicle Number dropdown cascade (same pattern as the booking form), to avoid listing 50+ vehicles at once.
   - Post-ship addition: `battery_records` gained an optional `next_due DATE` column + form field — plain data capture only, no badge or bell alert (unlike insurance's next_due).
+- Phase 12: Dashboard page (`src/pages/Dashboard.js`, super_admin only) — first and only page using a charting library (`recharts`, explicitly approved new dependency). From/To date filter (default today) + centre dropdown, all data re-fetched on any filter change via one `Promise.all`. 6 summary cards, then Vehicle Performance / Financial Breakdown / Booking Patterns / Customer Insights / Maintenance Overview / Staff Performance sections — pies, bars, a line chart, and 4 plain read-only tables (Pending Refunds, Top 10 Customers, Insurance Due ≤30 days, Vehicles with No Recent Maintenance). "Active Right Now," "Outstanding Deposits," insurance-due, and no-recent-maintenance all ignore the date filter by design (always current), but still respect the centre filter. `New vs Repeat Customers` classification uses an unfiltered global `customers` fetch (not centre-filtered) since `customers.centre_id` is reference-only and can point to whichever centre most recently booked that person — filtering it would misclassify existing customers as new. `BookingSheet.js` gained a "Dashboard" nav link (super_admin only, no badge), same condition as the Vehicles link.
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
 - src/App.js — Session routing: loading → Login → BookingSheet or VehicleMaster (activePage state; super_admin only for VehicleMaster)
 - src/pages/VehicleMaster.js — Admin page: assign vehicles to centres, mark inactive, add registrations, add new vehicle types inline (super_admin only)
+- src/pages/Maintenance.js — Vehicle maintenance/insurance/battery tracking (all users, group-shared RLS)
+- src/pages/Dashboard.js — Analytics dashboard with Recharts (super_admin only)
 - src/data/options.js — All dropdown options including booking types, centreOptions, payment options
 - src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
 - src/pages/BookingSheet.js — Main booking form; accepts { session, profile } props

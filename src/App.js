@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import BookingSheet from './pages/BookingSheet';
 import VehicleMaster from './pages/VehicleMaster';
 import Maintenance from './pages/Maintenance';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   const [authStatus, setAuthStatus] = useState('loading');
@@ -56,6 +57,9 @@ function App() {
   }
   if (activePage === 'maintenance') {
     return <Maintenance profile={profile} setActivePage={setActivePage} />;
+  }
+  if (activePage === 'dashboard' && profile.role === 'super_admin') {
+    return <Dashboard profile={profile} setActivePage={setActivePage} />;
   }
   return <BookingSheet session={session} profile={profile} setActivePage={setActivePage} />;
 }
