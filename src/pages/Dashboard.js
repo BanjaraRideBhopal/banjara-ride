@@ -67,6 +67,7 @@ export default function Dashboard({ profile, setActivePage }) {
   const [insuranceRecords, setInsuranceRecords] = useState([]);
   const [vehiclesList, setVehiclesList] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [mobileBookingCounts, setMobileBookingCounts] = useState({});
 
   useEffect(() => {
     loadCentres();
@@ -88,7 +89,7 @@ export default function Dashboard({ profile, setActivePage }) {
     const centreId = centreFilter === 'all' ? null : centreIdByName[centreFilter];
 
     let bookingsQuery = supabase.from('bookings')
-      .select('id, booking_date, booking_type, vehicle, full_amount_received, cash, paid_to, upi_amount, upi_paid_to, app_payment_amount, helmet, mobile, customer_name, centre, centre_id, status, refund_status, refund_amount')
+      .select('id, booking_date, booking_type, vehicle, full_amount_received, final_rent, security_deposit, cash, paid_to, upi_amount, upi_paid_to, app_payment_amount, mobile, customer_name, centre, centre_id, status, refund_status, refund_amount')
       .gte('booking_date', filterFrom).lte('booking_date', filterTo);
     if (centreId) bookingsQuery = bookingsQuery.eq('centre_id', centreId);
 
@@ -142,12 +143,27 @@ export default function Dashboard({ profile, setActivePage }) {
     setInsuranceRecords(insuranceData || []);
     setVehiclesList(vehiclesData || []);
     setCustomers(customersData || []);
+
+    // New vs Repeat: needs all-time booking counts per mobile for whoever booked in this range
+    const uniqueMobiles = Array.from(new Set((bookingsData || []).map(b => b.mobile).filter(Boolean)));
+    if (uniqueMobiles.length > 0) {
+      let allTimeQuery = supabase.from('bookings').select('mobile').in('mobile', uniqueMobiles);
+      if (centreId) allTimeQuery = allTimeQuery.eq('centre_id', centreId);
+      const { data: allTimeData } = await allTimeQuery;
+      const counts = {};
+      (allTimeData || []).forEach(b => { counts[b.mobile] = (counts[b.mobile] || 0) + 1; });
+      setMobileBookingCounts(counts);
+    } else {
+      setMobileBookingCounts({});
+    }
+
     setLoading(false);
   }
 
   // ── Summary cards ──────────────────────────────────
   const totalBookings = bookings.length;
-  const totalRevenue = bookings.reduce((sum, b) => sum + (parseFloat(b.full_amount_received) || 0), 0);
+  const rentRevenue = bookings.filter(b => b.status === 'end').reduce((sum, b) => sum + (parseFloat(b.final_rent) || 0), 0);
+  const depositsHeld = bookings.reduce((sum, b) => sum + (parseFloat(b.security_deposit) || 0), 0);
   const maintenanceSpend = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
   const outstandingDeposits = pendingRefunds.length;
 
@@ -163,14 +179,14 @@ export default function Dashboard({ profile, setActivePage }) {
   bookings.forEach(b => {
     const v = b.vehicle || 'Unknown';
     bookingsByVehicleType[v] = (bookingsByVehicleType[v] || 0) + 1;
-    revenueByVehicleType[v] = (revenueByVehicleType[v] || 0) + (parseFloat(b.full_amount_received) || 0);
+    revenueByVehicleType[v] = (revenueByVehicleType[v] || 0) + (parseFloat(b.final_rent) || 0);
   });
   const bookingsByVehiclePie = groupTopN(Object.entries(bookingsByVehicleType).map(([name, value]) => ({ name, value })));
   const revenueByVehiclePie = groupTopN(Object.entries(revenueByVehicleType).map(([name, value]) => ({ name, value })));
   const vehicleUtilisationBar = Object.entries(bookingsByVehicleType).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   const revenueByDate = {};
-  bookings.forEach(b => { revenueByDate[b.booking_date] = (revenueByDate[b.booking_date] || 0) + (parseFloat(b.full_amount_received) || 0); });
+  bookings.forEach(b => { revenueByDate[b.booking_date] = (revenueByDate[b.booking_date] || 0) + (parseFloat(b.final_rent) || 0); });
   const revenueTrend = Object.entries(revenueByDate).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));
   const showTrendNote = filterFrom === filterTo;
 
@@ -186,7 +202,7 @@ export default function Dashboard({ profile, setActivePage }) {
   const revenueByCentre = {};
   bookings.forEach(b => {
     const c = b.centre || 'Unknown';
-    revenueByCentre[c] = (revenueByCentre[c] || 0) + (parseFloat(b.full_amount_received) || 0);
+    revenueByCentre[c] = (revenueByCentre[c] || 0) + (parseFloat(b.final_rent) || 0);
   });
   const revenueByCentreBar = Object.entries(revenueByCentre).map(([name, value]) => ({ name, value }));
 
@@ -202,20 +218,13 @@ export default function Dashboard({ profile, setActivePage }) {
   const rangeDays = Math.round((new Date(filterTo) - new Date(filterFrom)) / 86400000) + 1;
   const showDayOfWeekNote = rangeDays < 7;
 
-  const helmetCounts = {};
-  bookings.forEach(b => { const h = b.helmet || 'Unknown'; helmetCounts[h] = (helmetCounts[h] || 0) + 1; });
-  const helmetPie = Object.entries(helmetCounts).map(([name, value]) => ({ name, value }));
-
   // ── Customer insights ───────────────────────────────
-  const customersByMobile = Object.fromEntries(customers.map(c => [c.mobile, c]));
   const uniqueMobilesInRange = Array.from(new Set(bookings.map(b => b.mobile).filter(Boolean)));
   let newCount = 0, repeatCount = 0;
   uniqueMobilesInRange.forEach(mobile => {
-    const cust = customersByMobile[mobile];
-    if (!cust) return;
-    const d = toLocalDateStr(cust.created_at);
-    if (d >= filterFrom && d <= filterTo) newCount++;
-    else repeatCount++;
+    const count = mobileBookingCounts[mobile] || 1;
+    if (count > 1) repeatCount++;
+    else newCount++;
   });
   const newVsRepeatPie = [{ name: 'New', value: newCount }, { name: 'Repeat', value: repeatCount }].filter(e => e.value > 0);
 
@@ -329,9 +338,10 @@ export default function Dashboard({ profile, setActivePage }) {
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="br-grid-3">
+      <div className="br-grid-4">
         <SummaryCard label="Total Bookings" value={totalBookings} />
-        <SummaryCard label="Total Revenue" value={formatINR(totalRevenue)} prefix="₹" />
+        <SummaryCard label="Rent Revenue" value={formatINR(rentRevenue)} prefix="₹" />
+        <SummaryCard label="Deposits Held" value={formatINR(depositsHeld)} prefix="₹" />
         <SummaryCard label="Active Right Now" value={activeBookingsCount} />
       </div>
       <div className="br-grid-3">
@@ -470,15 +480,6 @@ export default function Dashboard({ profile, setActivePage }) {
               {dayCounts.map((e, i) => <Cell key={e.name} fill={COLORS[i % COLORS.length]} />)}
             </Bar>
           </BarChart>
-        </ChartCard>
-        <ChartCard title="Helmet Usage" data={helmetPie}>
-          <PieChart>
-            <Pie data={helmetPie} dataKey="value" nameKey="name" label={({ name, value }) => `${name}: ${value}`}>
-              {helmetPie.map((e, i) => <Cell key={e.name} fill={COLORS[i % COLORS.length]} />)}
-            </Pie>
-            <Tooltip />
-            <Legend />
-          </PieChart>
         </ChartCard>
       </div>
 

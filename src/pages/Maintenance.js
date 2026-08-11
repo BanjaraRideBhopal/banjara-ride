@@ -106,6 +106,28 @@ export default function Maintenance({ profile, setActivePage }) {
     return { label: 'Valid', bg: '#d1fae5', color: '#065f46' };
   }
 
+  async function handleDeleteExpense(id) {
+    if (!window.confirm('Delete this maintenance entry? This cannot be undone.')) return;
+    const { error: err } = await supabase.from('maintenance_expenses').delete().eq('id', id);
+    if (err) { alert('Delete failed: ' + err.message); return; }
+    setExpenses(prev => prev.filter(e => e.id !== id));
+  }
+
+  async function handleDeleteInsurance(id) {
+    if (!window.confirm('Delete this insurance record? This cannot be undone.')) return;
+    const { error: err } = await supabase.from('insurance_records').delete().eq('id', id);
+    if (err) { alert('Delete failed: ' + err.message); return; }
+    setInsuranceHistory(prev => prev.filter(r => r.id !== id));
+    loadInsuranceStatus();
+  }
+
+  async function handleDeleteBattery(id) {
+    if (!window.confirm('Delete this battery record? This cannot be undone.')) return;
+    const { error: err } = await supabase.from('battery_records').delete().eq('id', id);
+    if (err) { alert('Delete failed: ' + err.message); return; }
+    setBatteryHistory(prev => prev.filter(r => r.id !== id));
+  }
+
   async function saveExpense() {
     if (!expenseForm.expense_date || !expenseForm.expense_type || !expenseForm.amount) {
       alert('Please fill Date, Type, and Amount');
@@ -301,6 +323,7 @@ export default function Maintenance({ profile, setActivePage }) {
                     <th style={th}>Type</th>
                     <th style={th}>Amount ₹</th>
                     <th style={th}>Description</th>
+                    {isOwner && <th style={th}></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -310,6 +333,7 @@ export default function Maintenance({ profile, setActivePage }) {
                       <td style={td}>{e.expense_type}</td>
                       <td style={td}>₹{e.amount}</td>
                       <td style={td}>{e.description || '—'}</td>
+                      {isOwner && <td style={td}><button onClick={() => handleDeleteExpense(e.id)} style={deleteBtn}>Delete</button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -368,6 +392,7 @@ export default function Maintenance({ profile, setActivePage }) {
                     <th style={th}>Last Renewed</th>
                     <th style={th}>Next Due</th>
                     <th style={th}>Notes</th>
+                    {isOwner && <th style={th}></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -376,6 +401,7 @@ export default function Maintenance({ profile, setActivePage }) {
                       <td style={td}>{r.last_renewed}</td>
                       <td style={td}>{r.next_due}</td>
                       <td style={td}>{r.notes || '—'}</td>
+                      {isOwner && <td style={td}><button onClick={() => handleDeleteInsurance(r.id)} style={deleteBtn}>Delete</button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -418,6 +444,7 @@ export default function Maintenance({ profile, setActivePage }) {
                     <th style={th}>Replaced Date</th>
                     <th style={th}>Next Due</th>
                     <th style={th}>Notes</th>
+                    {isOwner && <th style={th}></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -426,6 +453,7 @@ export default function Maintenance({ profile, setActivePage }) {
                       <td style={td}>{r.replaced_date}</td>
                       <td style={td}>{r.next_due || '—'}</td>
                       <td style={td}>{r.notes || '—'}</td>
+                      {isOwner && <td style={td}><button onClick={() => handleDeleteBattery(r.id)} style={deleteBtn}>Delete</button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -484,3 +512,4 @@ const th = { padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: '
 const td = { padding: '8px 10px', fontSize: '13px', color: '#333', borderBottom: '1px solid #f0f0f0' };
 const btnPrimary = { background: '#1a56a0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' };
 const btnSecondary = { padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', cursor: 'pointer', fontSize: '14px' };
+const deleteBtn = { padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fee2e2', color: '#991b1b', cursor: 'pointer', fontWeight: '600' };
