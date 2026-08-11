@@ -39,6 +39,7 @@
   - Post-ship addition: `battery_records` gained an optional `next_due DATE` column + form field — plain data capture only, no badge or bell alert (unlike insurance's next_due).
 - Phase 12: Dashboard page (`src/pages/Dashboard.js`, super_admin only) — first and only page using a charting library (`recharts`, explicitly approved new dependency). From/To date filter (default today) + centre dropdown, all data re-fetched on any filter change via one `Promise.all`. 6 summary cards, then Vehicle Performance / Financial Breakdown / Booking Patterns / Customer Insights / Maintenance Overview / Staff Performance sections — pies, bars, a line chart, and 4 plain read-only tables (Pending Refunds, Top 10 Customers, Insurance Due ≤30 days, Vehicles with No Recent Maintenance). "Active Right Now," "Outstanding Deposits," insurance-due, and no-recent-maintenance all ignore the date filter by design (always current), but still respect the centre filter. `BookingSheet.js` gained a "Dashboard" nav link (super_admin only, no badge), same condition as the Vehicles link.
 - Phase 12b: Dashboard fixes — "Total Revenue" card split into "Rent Revenue" (`final_rent`, `status='end'` only) + "Deposits Held" (`security_deposit`, all bookings); revenue charts (vehicle type pie, centre bar, trend line) switched from `full_amount_received` to `final_rent`; summary cards now 7 (`br-grid-4` + `br-grid-3`). Helmet Usage pie removed entirely. New vs Repeat Customers classification rebuilt: no longer uses `customers.created_at` (was nearly-always-100%-new and useless) — now counts each mobile's all-time bookings (centre-filtered), Repeat = >1 ever, New = exactly 1. `Maintenance.js` gained super_admin-only Delete buttons on all 3 record types (expenses/insurance/battery), backed by 3 new `super_admin_delete` DELETE RLS policies (one per maintenance table).
+- Phase 13: Deduction folded into Actual Rent. `final_rent` (Actual Rent) now = Base Rent + Total Extra Charge + Deduction (previously deduction was subtracted separately at the Refund Amount stage, not part of Actual Rent). Refund Amount = Full Amount − Actual Rent (deduction no longer subtracted a second time). Deduction change now cascades to Actual Rent then Refund Amount (previously skipped straight to Refund Amount). UI: Deduction / Reason for Deduction / Damage-Fine Description moved above Actual Rent in the close booking form; Actual Rent label + value now bold. One-time backfill: 6 historical `status='end'` bookings with `deduction > 0` had `final_rent` increased by their `deduction` amount, so historical and new bookings are consistent under the new formula. `Dashboard.js` needed no change — "Rent Revenue" already reads `final_rent`.
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -149,10 +150,10 @@ Each is a fixed option with a fixed rate — no number picker needed.
 
 ### Phase 2 — Close Booking (vehicle returned)
 - Triggered by Close button (only on status='start' rows)
-- Fields: Actual Return Date/Time, Helmet Returned, End KM, KM Driven (auto),
-  Extra Hours (manual), Extra Charge (auto), Actual Rent (auto),
+- Fields, in order: Actual Return Date/Time, Helmet Returned, End KM, KM Driven (auto),
+  Extra Hours/Days (manual) + charges (auto), Total Extra Charge,
   Deduction, Reason for Deduction, Damage/Fine Description (conditional),
-  Refund Amount (auto, TARGET), Refund Status, Refund Cash / UPI / App Payment ₹ with individual Refund By dropdowns; refund match indicator
+  Actual Rent (auto, **bold**, includes deduction — Phase 13), Refund Amount (auto, TARGET), Refund Status, Refund Cash / UPI / App Payment ₹ with individual Refund By dropdowns; refund match indicator
 - Status set to 'end' on save
 
 ## Edit Behaviour
@@ -173,10 +174,11 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Extra Hours Charge: Extra Hours × vehicle.lateChargePerHour (from DB)
 - Extra Days Charge: Extra Days × vehicle rate_1day (from DB)
 - Total Extra Charge: Extra Hours Charge + Extra Days Charge
-- Actual Rent: Base Rent + Total Extra Charge
-- Refund Amount: Full Amount Received − Actual Rent − Deduction
+- Actual Rent: Base Rent + Total Extra Charge + Deduction (Phase 13 — deduction folded in; was a separate subtraction at the refund stage before)
+- Refund Amount: Full Amount Received − Actual Rent
 - KM Driven: End KM − Start KM
 - **Phase 9:** Rent Amount, Security Deposit, Extra Hours Charge, Extra Days Charge, Total Extra Charge, Actual Rent, and Refund Amount are all editable (not readOnly). Each still auto-fills on its trigger event, but a manual edit is never silently overwritten — `recalculate()`/`recalculateFinal()` take a `triggerField` param and skip auto-setting whichever field the user just typed into. Downstream fields still recalculate from the edited value (e.g. editing Actual Rent recalculates Refund Amount).
+- **Phase 13:** Deduction is manual-only (never auto-filled), so it needs no `triggerField` guard of its own — any trigger other than `'rentAmount'` already re-derives Actual Rent (now including deduction), which naturally fires on a deduction change too.
 
 ## Payment Rules
 - Three payment fields: Cash ₹, UPI ₹, App Payment ₹ (any combination allowed)

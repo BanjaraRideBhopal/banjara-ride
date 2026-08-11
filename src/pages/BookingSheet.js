@@ -579,13 +579,13 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     }
     if (triggerField !== 'rentAmount') {
       const totalExtraCharge = parseFloat(updated.totalExtraCharge) || 0;
-      updated.rentAmount = baseRent + totalExtraCharge;
+      const deduction = parseFloat(updated.deduction) || 0;
+      updated.rentAmount = baseRent + totalExtraCharge + deduction;
     }
     if (triggerField !== 'refundAmount') {
       const fullAmount = parseFloat(booking.full_amount_received) || 0;
       const rentAmount = parseFloat(updated.rentAmount) || 0;
-      const deduction = parseFloat(updated.deduction) || 0;
-      updated.refundAmount = fullAmount - rentAmount - deduction;
+      updated.refundAmount = fullAmount - rentAmount;
     }
     return updated;
   }
@@ -1253,12 +1253,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                     <input type="number" name="extraDaysCharge" value={finalForm.extraDaysCharge} onChange={handleFinalChange} style={{ ...input, background: '#fff7ed' }} />
                   </Field>
                 </div>
-                <div className="br-grid-4">
+                <div className="br-grid-3">
                   <Field label="Total Extra Charge ₹">
                     <input type="number" name="totalExtraCharge" value={finalForm.totalExtraCharge} onChange={handleFinalChange} style={{ ...input, background: '#fff7ed' }} />
-                  </Field>
-                  <Field label="Actual Rent ₹">
-                    <input type="number" name="rentAmount" value={finalForm.rentAmount} onChange={handleFinalChange} style={{ ...input, background: '#f0f4ff' }} />
                   </Field>
                   <Field label="Deduction ₹">
                     <input type="number" name="deduction" value={finalForm.deduction} onChange={handleFinalChange} style={input} placeholder="0" />
@@ -1276,6 +1273,10 @@ export default function BookingSheet({ session, profile, setActivePage }) {
                       <textarea name="damagedFine" value={finalForm.damagedFine} onChange={handleFinalChange} style={{ ...input, resize: 'vertical', minHeight: '38px' }} placeholder="Describe damage or penalty..." />
                     </Field>
                   )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', color: '#666', fontWeight: '700' }}>Actual Rent ₹</label>
+                    <input type="number" name="rentAmount" value={finalForm.rentAmount} onChange={handleFinalChange} style={{ ...input, background: '#f0f4ff', fontWeight: 'bold' }} />
+                  </div>
                   <Field label="Refund Amount ₹">
                     <input type="number" name="refundAmount" value={finalForm.refundAmount} onChange={handleFinalChange} style={{ ...input, background: '#f0f4ff' }} />
                   </Field>

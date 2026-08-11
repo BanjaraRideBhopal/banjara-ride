@@ -151,8 +151,8 @@ Helper functions (security definer, stable, authenticated only): `get_my_centre_
 Expected Return  = Booking Date + Time + Duration hours   (local TZ — getFullYear/getMonth/getDate)
 Full Amount      = Rent + Security Deposit + Delivery Charges
 Extra Charge     = Extra Hours × late_charge_per_hour     (from DB)
-Actual Rent      = Base Rent + Extra Charge
-Refund Amount    = Full Amount − Base Rent − Extra Charges − Deduction
+Actual Rent      = Base Rent + Total Extra Charge + Deduction   (Phase 13 — deduction folded in)
+Refund Amount    = Full Amount − Actual Rent
 KM Driven        = End KM − Start KM
 ```
 
