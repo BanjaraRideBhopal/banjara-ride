@@ -18,8 +18,8 @@
 - No backend — frontend only
 - Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
-## Current Build Status (as of 2026-07-29)
-- Phases 1–9 of multi-centre build are complete and live
+## Current Build Status (as of 2026-08-17)
+- Phases 1–14 of multi-centre build are complete and live
 - Phase 1: DB migration — centres, vehicle_types, vehicles tables seeded; bookings/customers restructured with centre_id
 - Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
@@ -40,12 +40,13 @@
 - Phase 12: Dashboard page (`src/pages/Dashboard.js`, super_admin only) — first and only page using a charting library (`recharts`, explicitly approved new dependency). From/To date filter (default today) + centre dropdown, all data re-fetched on any filter change via one `Promise.all`. 6 summary cards, then Vehicle Performance / Financial Breakdown / Booking Patterns / Customer Insights / Maintenance Overview / Staff Performance sections — pies, bars, a line chart, and 4 plain read-only tables (Pending Refunds, Top 10 Customers, Insurance Due ≤30 days, Vehicles with No Recent Maintenance). "Active Right Now," "Outstanding Deposits," insurance-due, and no-recent-maintenance all ignore the date filter by design (always current), but still respect the centre filter. `BookingSheet.js` gained a "Dashboard" nav link (super_admin only, no badge), same condition as the Vehicles link.
 - Phase 12b: Dashboard fixes — "Total Revenue" card split into "Rent Revenue" (`final_rent`, `status='end'` only) + "Deposits Held" (`security_deposit`, all bookings); revenue charts (vehicle type pie, centre bar, trend line) switched from `full_amount_received` to `final_rent`; summary cards now 7 (`br-grid-4` + `br-grid-3`). Helmet Usage pie removed entirely. New vs Repeat Customers classification rebuilt: no longer uses `customers.created_at` (was nearly-always-100%-new and useless) — now counts each mobile's all-time bookings (centre-filtered), Repeat = >1 ever, New = exactly 1. `Maintenance.js` gained super_admin-only Delete buttons on all 3 record types (expenses/insurance/battery), backed by 3 new `super_admin_delete` DELETE RLS policies (one per maintenance table).
 - Phase 13: Deduction folded into Actual Rent. `final_rent` (Actual Rent) now = Base Rent + Total Extra Charge + Deduction (previously deduction was subtracted separately at the Refund Amount stage, not part of Actual Rent). Refund Amount = Full Amount − Actual Rent (deduction no longer subtracted a second time). Deduction change now cascades to Actual Rent then Refund Amount (previously skipped straight to Refund Amount). UI: Deduction / Reason for Deduction / Damage-Fine Description moved above Actual Rent in the close booking form; Actual Rent label + value now bold. One-time backfill: 6 historical `status='end'` bookings with `deduction > 0` had `final_rent` increased by their `deduction` amount, so historical and new bookings are consistent under the new formula. `Dashboard.js` needed no change — "Rent Revenue" already reads `final_rent`.
+- Phase 14: Rate Groups. Rates now live per `(vehicle_type, rate_group)` combination in a new `vehicle_type_rates` table, not globally on `vehicle_types` — lets the same vehicle type (e.g. Activa) have different prices at different rate groups (Company Owned vs IISER). `vehicle_types` rate columns are **deprecated** (kept, unused by app logic, reference only). Every vehicle now has a `rate_group_id`; rate lookups in `BookingSheet.js` (initial booking auto-fill, duration dropdown filtering, and close-booking extra-charge calculations) all resolve via `(selected vehicle's own vehicle_type_id, its registration's rate_group_id)`, not the vehicle type alone. Missing rate card → inline warning, blank rent/deposit, blocked save. `VehicleMaster.js` gained: a Rate Group column, a full edit form (registration + active for staff, + vehicle type + rate group + centre for super_admin, with duplicate-registration validation), a Rate Group field on Add Vehicle (auto-defaulted from centre), and a super_admin-only Rate Cards management section (add/edit rate cards, no delete). **Vehicle Master is now reachable by staff too** (was super_admin-only) — `App.js` routing and the `BookingSheet.js` nav link both opened up; a new `vehicles_update_staff_own_centre` RLS policy lets staff UPDATE vehicles in their own centre (DB-level scoping is by row/centre only, not by column — the UI is what limits staff to Registration+Active). One known gap surfaced by the migration: IISER's Access 125 vehicle (MP04SQ7201) has no IISER rate card yet (only VEHICLE BHAURI was migrated per spec) — shows the warning until an admin adds one via Rate Cards.
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
 - src/pages/Login.js — Email/password sign-in (signInWithPassword, inline error, no redirect — App.js handles routing)
 - src/App.js — Session routing: loading → Login → BookingSheet or VehicleMaster (activePage state; super_admin only for VehicleMaster)
-- src/pages/VehicleMaster.js — Admin page: assign vehicles to centres, mark inactive, add registrations, add new vehicle types inline (super_admin only)
+- src/pages/VehicleMaster.js — Vehicle admin: assign centres/rate groups, mark inactive, add registrations, add new vehicle types inline, manage rate cards. Reachable by all logged-in users as of Phase 14 (was super_admin-only) — staff get a reduced edit form (registration + active only) and no Add Vehicle / Rate Cards access
 - src/pages/Maintenance.js — Vehicle maintenance/insurance/battery tracking (all users, group-shared RLS)
 - src/pages/Dashboard.js — Analytics dashboard with Recharts (super_admin only)
 - src/data/options.js — All dropdown options including booking types, centreOptions, payment options
@@ -80,12 +81,23 @@
 
 ### vehicle_types
 - id, name, security_deposit, late_charge_per_hour
-- rate_3hr through rate_3months (13 rate columns, null = duration not available for this type)
-- 18 rows seeded
+- rate_3hr through rate_3months (13 rate columns) — **DEPRECATED as of Phase 14**: still present, still selected by `loadVehiclesAndCentres()` as reference data, but no longer used for any actual rent/deposit calculation. Not dropped — a future phase may remove them once `vehicle_type_rates` is fully trusted.
+- 22 rows (21 original + VEHICLE BHAURI)
+
+### rate_groups (Phase 14)
+- `id BIGINT PK`, `name TEXT UNIQUE NOT NULL`, `created_at`
+- 2 rows: `Company Owned` (id 1), `IISER` (id 2)
+- RLS: all authenticated can SELECT; super_admin can write (`super_admin_write` policy, `FOR ALL`)
+
+### vehicle_type_rates (Phase 14)
+- `id BIGINT PK`, `vehicle_type_id BIGINT FK → vehicle_types`, `rate_group_id BIGINT FK → rate_groups`, `security_deposit`, `late_charge_per_hour`, `rate_3hr` … `rate_3months` (13 columns, nullable — null = duration unavailable for this type/group)
+- `UNIQUE (vehicle_type_id, rate_group_id)` — one rate card per combination
+- **This is now the source of truth for all rent/deposit calculations** — `vehicle_types`' own rate columns are deprecated (see above)
+- RLS: all authenticated can SELECT; super_admin can write
 
 ### vehicles (registrations)
-- id, registration_number, vehicle_type_id FK → vehicle_types, centre_id FK → centres, active BOOL
-- 53 rows (as of 2026-07-29): 52 at Sonagiri, 1 at IISER Bhouri (MP04SQ7201, Access 125), 0 at Rani Kamlapati (shares Sonagiri's fleet via group RLS)
+- id, registration_number, vehicle_type_id FK → vehicle_types, centre_id FK → centres, active BOOL, **rate_group_id BIGINT FK → rate_groups NOT NULL (added Phase 14)**
+- 58 rows (as of 2026-08-17): 53 at company centres (Sonagiri/Rani Kamlapati), 5 at IISER Bhouri (4 × VEHICLE BHAURI, 1 × Access 125 — MP04SQ7201, which has no IISER rate card yet)
 
 ### customers
 - id (BIGSERIAL PK — surrogate), mobile TEXT, name TEXT, centre_id INT FK → centres (kept for reference only), created_at
@@ -110,17 +122,19 @@
 - refund_amount, refund_status, refund_by, created_at
 - Legacy/unused: num_days, num_weeks (TEXT — predate centre restructure, not read or written by current code)
 
-## RLS (live as of 2026-07-16)
+## RLS (live as of 2026-08-17)
 - Helper functions: `public.get_my_centre_id()`, `public.is_super_admin()`, `public.is_franchise_user()` — security definer, stable, granted to authenticated only
 - bookings: staff select/insert/update own centre only; super_admin all; anon blocked
 - customers: all authenticated can read/write — global pool, one mobile = one customer across all centres; anon blocked
-- vehicles: company staff see all company-centre vehicles; franchise (IISER) see only own; super_admin can write
+- vehicles: SELECT — company staff see all company-centre vehicles, franchise (IISER) see only own, super_admin all. INSERT/DELETE — super_admin only. UPDATE (Phase 14) — **two policies, OR'd together**: `vehicles_update_super_admin_only` (`is_super_admin()`, any row) and `vehicles_update_staff_own_centre` (`centre_id = get_my_centre_id()`, both USING and WITH CHECK — staff can update rows in their own centre, and the WITH CHECK stops them changing `centre_id` to a different centre; RLS cannot restrict *which columns* they touch, only which rows — the app UI is what limits staff to Registration Number + Active).
 - vehicle_types + centres: all authenticated can select; super_admin can write
+- rate_groups / vehicle_type_rates (Phase 14): all authenticated can select; super_admin can write (`FOR ALL`, covers insert/update/delete)
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 - maintenance_expenses / insurance_records / battery_records (Phase 11): SELECT + INSERT mirror `vehicles`' group-sharing logic — company staff see/write all company-centre records regardless of which company centre logged them; franchise (IISER) staff see/write only their own centre; super_admin all. No UPDATE policy (no edit feature). DELETE (Phase 12b): `super_admin_delete` policy on all 3 tables, `USING (is_super_admin())` — staff cannot delete. No explicit anon-deny policy needed — RLS enabled + zero anon policies already default-denies, same as bookings/vehicles.
 
-## Vehicles (21 types, 10 rate groups)
-Vehicle data is now loaded from the `vehicle_types` + `vehicles` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
+## Vehicles (22 types, rate groups now per (type, group) — see Phase 14)
+Vehicle data is now loaded from the `vehicle_types` + `vehicles` + `vehicle_type_rates` + `rate_groups` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
+The rate table below reflects the original (pre-Phase-14) "Company Owned" rates, now living in `vehicle_type_rates`. IISER has its own separate rate cards (currently: VEHICLE BHAURI only, copied verbatim from its old `vehicle_types` row — real IISER pricing still needs to be set via Vehicle Master's Rate Cards section).
 Rate groups (deposit / late charge per hour):
 - Lectrix EV: ₹800, ₹65/hr — no 3Hr option
 - Jupiter BS6 / Activa 6G: ₹800, ₹65/hr

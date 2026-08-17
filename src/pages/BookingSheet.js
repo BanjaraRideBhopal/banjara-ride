@@ -184,6 +184,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   const [exportTo, setExportTo] = useState(getToday());
   const [exporting, setExporting] = useState(false);
   const [insuranceDue, setInsuranceDue] = useState([]);
+  const [vehicleTypeRates, setVehicleTypeRates] = useState([]);
+  const [vehicleRegToGroup, setVehicleRegToGroup] = useState({});
 
   const bookingsRef = useRef([]);
   const notifiedIds = useRef(new Set());
@@ -194,6 +196,10 @@ export default function BookingSheet({ session, profile, setActivePage }) {
 
   const selectedVehicle = vehicles.find(v => v.type === form.vehicle);
   const returningBooking = bookings.find(b => b.id === returningId) || activeOutBookings.find(b => b.id === returningId);
+
+  const { rateGroupId: selectedRateGroupId, card: selectedRateCard } = lookupRateCard(form.vehicle, form.vehicleNumber);
+  const noRateCardWarning = !!(selectedVehicle && form.vehicleNumber && selectedRateGroupId && !selectedRateCard);
+  const rateCardVehicle = rateCardToVehicle(selectedRateCard);
 
   const visibleApproaching = approachingReturns.filter(b => !dismissedBannerIds.current.has(b.id));
   const insuranceDueCount = insuranceDue.length;
@@ -249,12 +255,16 @@ export default function BookingSheet({ session, profile, setActivePage }) {
   }
 
   async function loadVehiclesAndCentres() {
-    const [{ data: types }, { data: regs }, { data: centres }] = await Promise.all([
+    const [{ data: types }, { data: allRegs }, { data: centres }, { data: vtRates }] = await Promise.all([
       supabase.from('vehicle_types').select('*'),
-      supabase.from('vehicles').select('*').eq('active', true),
+      supabase.from('vehicles').select('*'), // all vehicles, not just active — closing old bookings needs rate lookups even for deactivated vehicles
       supabase.from('centres').select('id, name'),
+      supabase.from('vehicle_type_rates').select('*'),
     ]);
+    const activeRegs = (allRegs || []).filter(r => r.active);
     if (types) {
+      // vehicle_types rate columns kept as reference only — actual rent/deposit lookup uses
+      // vehicle_type_rates (per selected registration's rate_group_id), see lookupRateCard()
       setVehicles(types.map(t => ({
         id: t.id,
         type: t.name,
@@ -265,12 +275,36 @@ export default function BookingSheet({ session, profile, setActivePage }) {
         ),
         lateChargePerHour: t.late_charge_per_hour,
         securityDeposit: t.security_deposit,
-        registrations: (regs || []).filter(r => r.vehicle_type_id === t.id).map(r => r.registration_number),
+        registrations: activeRegs.filter(r => r.vehicle_type_id === t.id).map(r => r.registration_number),
       })));
     }
     if (centres) {
       setCentreIdByName(Object.fromEntries(centres.map(c => [c.name, c.id])));
     }
+    setVehicleTypeRates(vtRates || []);
+    setVehicleRegToGroup(Object.fromEntries((allRegs || []).map(r => [r.registration_number, r.rate_group_id])));
+  }
+
+  function lookupRateCard(vehicleTypeName, vehicleNumber) {
+    const vType = vehicleTypeName ? vehicles.find(veh => veh.type === vehicleTypeName) : null;
+    const rateGroupId = vehicleNumber ? vehicleRegToGroup[vehicleNumber] : null;
+    const card = vType && rateGroupId
+      ? vehicleTypeRates.find(r => r.vehicle_type_id === vType.id && r.rate_group_id === rateGroupId)
+      : null;
+    return { vType, rateGroupId, card };
+  }
+
+  function rateCardToVehicle(card) {
+    if (!card) return null;
+    return {
+      rates: Object.fromEntries(
+        Object.entries(RATE_COLUMN_TO_LABEL)
+          .filter(([col]) => card[col] !== null)
+          .map(([col, label]) => [label, card[col]])
+      ),
+      lateChargePerHour: card.late_charge_per_hour,
+      securityDeposit: card.security_deposit,
+    };
   }
 
   function parseReturnDT(str) {
@@ -370,13 +404,14 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     );
     updated.expectedReturnDateTime = returnDT;
 
-    const v = updated.vehicle ? vehicles.find(veh => veh.type === updated.vehicle) : null;
+    const { card } = lookupRateCard(updated.vehicle, updated.vehicleNumber);
+    const v = rateCardToVehicle(card);
 
-    if (v && triggerField === 'vehicle') {
-      updated.securityDeposit = v.securityDeposit;
+    if (triggerField === 'vehicle' || triggerField === 'vehicleNumber') {
+      updated.securityDeposit = v ? v.securityDeposit : '';
     }
-    if (v && updated.bookingType && (triggerField === 'vehicle' || triggerField === 'bookingType')) {
-      updated.rentAmount = calculateRentAmount(v, updated.bookingType, 0);
+    if (updated.bookingType && (triggerField === 'vehicle' || triggerField === 'vehicleNumber' || triggerField === 'bookingType')) {
+      updated.rentAmount = v ? calculateRentAmount(v, updated.bookingType, 0) : '';
     }
     if (autoFillAmount) {
       updated.fullAmountReceived = (parseFloat(updated.rentAmount) || 0) + (parseFloat(updated.securityDeposit) || 0) + (parseFloat(updated.deliveryCharges) || 0);
@@ -401,7 +436,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     if (name === 'cash' && !value) updated.paidTo = '';
     if (name === 'upiAmount' && !value) updated.upiPaidTo = '';
 
-    const autoFillAmount = ['vehicle', 'bookingType', 'deliveryCharges', 'rentAmount', 'securityDeposit'].includes(name);
+    const autoFillAmount = ['vehicle', 'vehicleNumber', 'bookingType', 'deliveryCharges', 'rentAmount', 'securityDeposit'].includes(name);
     updated = recalculate(updated, autoFillAmount, name);
     setForm(updated);
   }
@@ -479,6 +514,10 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     e.preventDefault();
     if (!form.customerName || !form.mobileNumber || !form.vehicle || !form.centre) {
       alert('Please fill Customer Name, Mobile Number, Vehicle and Centre');
+      return;
+    }
+    if (noRateCardWarning) {
+      alert('No rate card configured for this vehicle. Contact admin before booking it.');
       return;
     }
 
@@ -560,7 +599,8 @@ export default function BookingSheet({ session, profile, setActivePage }) {
 
   function recalculateFinal(updated, booking, triggerField = '') {
     updated.kmDriven = calculateKmDriven(booking.start_km, updated.endKm);
-    const v = vehicles.find(veh => veh.type === booking.vehicle);
+    const { card } = lookupRateCard(booking.vehicle, booking.vehicle_number);
+    const v = rateCardToVehicle(card);
     const baseRent = v ? calculateRentAmount(v, booking.booking_type, 0) : 0;
     const rate1Day = v ? (v.rates['1 Day'] || 0) : 0;
 
@@ -957,11 +997,9 @@ export default function BookingSheet({ session, profile, setActivePage }) {
             )}
           </button>
 
-          {isOwner && (
-            <button onClick={() => setActivePage('vehicles')} style={btnSecondary}>
-              Vehicles
-            </button>
-          )}
+          <button onClick={() => setActivePage('vehicles')} style={btnSecondary}>
+            Vehicles
+          </button>
 
           {isOwner && (
             <button onClick={() => setActivePage('dashboard')} style={btnSecondary}>
@@ -1029,6 +1067,11 @@ export default function BookingSheet({ session, profile, setActivePage }) {
               <input type="number" name="startKm" value={form.startKm} onChange={handleChange} style={input} placeholder="Odometer reading" />
             </Field>
           </div>
+          {noRateCardWarning && (
+            <div style={{ fontSize: '13px', color: '#991b1b', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 12px', marginBottom: '16px' }}>
+              ⚠ No rate card configured for this vehicle. Contact admin.
+            </div>
+          )}
 
           <SectionTitle title="Trip Details" />
           <div className={isOwner ? "br-grid-4" : "br-grid-3"}>
@@ -1060,9 +1103,11 @@ export default function BookingSheet({ session, profile, setActivePage }) {
               })()}
             </Field>
             <Field label="Booking Duration *">
-              <select name="bookingType" value={form.bookingType} onChange={handleChange} style={input} disabled={!selectedVehicle}>
-                <option value="">{selectedVehicle ? 'Select...' : 'Select vehicle first'}</option>
-                {selectedVehicle && bookingTypes.filter(bt => selectedVehicle.rates[bt] != null).map(b => <option key={b}>{b}</option>)}
+              <select name="bookingType" value={form.bookingType} onChange={handleChange} style={input} disabled={!rateCardVehicle}>
+                <option value="">
+                  {rateCardVehicle ? 'Select...' : !selectedVehicle ? 'Select vehicle first' : !form.vehicleNumber ? 'Select vehicle number first' : 'No rate card for this vehicle'}
+                </option>
+                {rateCardVehicle && bookingTypes.filter(bt => rateCardVehicle.rates[bt] != null).map(b => <option key={b}>{b}</option>)}
               </select>
             </Field>
             {isOwner && (
@@ -1233,7 +1278,7 @@ export default function BookingSheet({ session, profile, setActivePage }) {
 
           <SectionTitle title="Final Payment" />
           {(() => {
-            const returningVehicle = vehicles.find(v => v.type === returningBooking.vehicle);
+            const returningVehicle = rateCardToVehicle(lookupRateCard(returningBooking.vehicle, returningBooking.vehicle_number).card);
             const lateCharge = returningVehicle ? returningVehicle.lateChargePerHour : 0;
             const rate1Day = returningVehicle ? (returningVehicle.rates['1 Day'] || 0) : 0;
             const showDamageField = ['Damage', 'Penalty'].includes(finalForm.reasonForDeduction);

@@ -52,7 +52,7 @@ function App() {
     </div>
   );
   if (!profile) return null;
-  if (activePage === 'vehicles' && profile.role === 'super_admin') {
+  if (activePage === 'vehicles') {
     return <VehicleMaster profile={profile} setActivePage={setActivePage} />;
   }
   if (activePage === 'maintenance') {
