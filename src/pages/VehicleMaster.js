@@ -9,7 +9,8 @@ const emptyAdd = {
 };
 
 const emptyRateCard = {
-  vehicle_type_id: '', rate_group_id: '', security_deposit: '', late_charge_per_hour: '',
+  vehicle_type_id: '', rate_group_id: '', isNewType: false, newTypeName: '',
+  security_deposit: '', late_charge_per_hour: '',
   rate3hr: '', rate6hr: '', rate12hr: '', rate1day: '', rate2days: '', rate3days: '',
   rate4days: '', rate5days: '', rate6days: '', rate7days: '', rate15days: '', rate1month: '', rate3months: '',
 };
@@ -185,9 +186,22 @@ export default function VehicleMaster({ profile, setActivePage }) {
     }));
   }
 
+  function handleRateCardTypeChange(val) {
+    setAddRateCardForm(p => ({
+      ...p,
+      vehicle_type_id: val,
+      isNewType: val === '__new__',
+      newTypeName: val === '__new__' ? p.newTypeName : '',
+    }));
+  }
+
   async function saveAddRateCard() {
-    if (!addRateCardForm.vehicle_type_id || !addRateCardForm.rate_group_id) {
-      alert('Please select Vehicle Type and Rate Group');
+    if (addRateCardForm.isNewType ? !addRateCardForm.newTypeName.trim() : !addRateCardForm.vehicle_type_id) {
+      alert(addRateCardForm.isNewType ? 'Please enter the new vehicle type name' : 'Please select Vehicle Type and Rate Group');
+      return;
+    }
+    if (!addRateCardForm.rate_group_id) {
+      alert('Please select Rate Group');
       return;
     }
     const rateFields = rateLabels.map(([f]) => f);
@@ -195,15 +209,27 @@ export default function VehicleMaster({ profile, setActivePage }) {
       alert('Please fill deposit, late charge, and all 13 rates');
       return;
     }
-    const dup = vehicleTypeRates.some(r =>
-      String(r.vehicle_type_id) === addRateCardForm.vehicle_type_id && String(r.rate_group_id) === addRateCardForm.rate_group_id
-    );
-    if (dup) { alert('A rate card for this Vehicle Type + Rate Group combination already exists'); return; }
+    if (!addRateCardForm.isNewType) {
+      const dup = vehicleTypeRates.some(r =>
+        String(r.vehicle_type_id) === addRateCardForm.vehicle_type_id && String(r.rate_group_id) === addRateCardForm.rate_group_id
+      );
+      if (dup) { alert('A rate card for this Vehicle Type + Rate Group combination already exists'); return; }
+    }
 
     setSaving(true);
     setError('');
+
+    let vehicleTypeId = parseInt(addRateCardForm.vehicle_type_id);
+    if (addRateCardForm.isNewType) {
+      const { data: newType, error: typeErr } = await supabase.from('vehicle_types').insert({
+        name: addRateCardForm.newTypeName.trim(),
+      }).select('id').single();
+      if (typeErr) { setError(typeErr.message); setSaving(false); return; }
+      vehicleTypeId = newType.id;
+    }
+
     const { error: err } = await supabase.from('vehicle_type_rates').insert({
-      vehicle_type_id: parseInt(addRateCardForm.vehicle_type_id),
+      vehicle_type_id: vehicleTypeId,
       rate_group_id: parseInt(addRateCardForm.rate_group_id),
       ...rateFormToPayload(addRateCardForm),
     });
@@ -519,8 +545,9 @@ export default function VehicleMaster({ profile, setActivePage }) {
               <div className="br-grid-4" style={{ marginBottom: '14px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={labelStyle}>Vehicle Type *</label>
-                  <select value={addRateCardForm.vehicle_type_id} onChange={e => setAddRateCardForm(p => ({ ...p, vehicle_type_id: e.target.value }))} style={input}>
+                  <select value={addRateCardForm.vehicle_type_id} onChange={e => handleRateCardTypeChange(e.target.value)} style={input}>
                     <option value="">Select...</option>
+                    <option value="__new__">+ Add new type...</option>
                     {vehicleTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
@@ -531,6 +558,18 @@ export default function VehicleMaster({ profile, setActivePage }) {
                     {rateGroups.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
+                {addRateCardForm.isNewType && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={labelStyle}>Type Name *</label>
+                    <input
+                      type="text"
+                      value={addRateCardForm.newTypeName}
+                      onChange={e => setAddRateCardForm(p => ({ ...p, newTypeName: e.target.value }))}
+                      style={input}
+                      placeholder="e.g. Maestro"
+                    />
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={labelStyle}>Security Deposit ₹ *</label>
                   <input type="number" value={addRateCardForm.security_deposit} onChange={e => setAddRateCardForm(p => ({ ...p, security_deposit: e.target.value }))} style={input} placeholder="e.g. 800" />
