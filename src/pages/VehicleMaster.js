@@ -145,6 +145,8 @@ export default function VehicleMaster({ profile, setActivePage }) {
     if (addForm.isNewType) {
       const { data: newType, error: typeErr } = await supabase.from('vehicle_types').insert({
         name: addForm.newTypeName.trim(),
+        security_deposit: parseInt(addForm.newTypeDeposit) || 0,
+        late_charge_per_hour: parseInt(addForm.newTypeLateCharge) || 0,
       }).select('id').single();
       if (typeErr) { setError(typeErr.message); setSaving(false); return; }
       vehicleTypeId = newType.id;
@@ -223,6 +225,8 @@ export default function VehicleMaster({ profile, setActivePage }) {
     if (addRateCardForm.isNewType) {
       const { data: newType, error: typeErr } = await supabase.from('vehicle_types').insert({
         name: addRateCardForm.newTypeName.trim(),
+        security_deposit: parseInt(addRateCardForm.security_deposit) || 0,
+        late_charge_per_hour: parseInt(addRateCardForm.late_charge_per_hour) || 0,
       }).select('id').single();
       if (typeErr) { setError(typeErr.message); setSaving(false); return; }
       vehicleTypeId = newType.id;
