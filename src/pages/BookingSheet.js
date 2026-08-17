@@ -30,6 +30,14 @@ function addDays(dateStr, days) {
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
 }
 
+const RATE_COLUMN_TO_LABEL = {
+  rate_3hr: '3 Hr', rate_6hr: '6 Hr', rate_12hr: '12 Hr',
+  rate_1day: '1 Day', rate_2days: '2 Days', rate_3days: '3 Days',
+  rate_4days: '4 Days', rate_5days: '5 Days', rate_6days: '6 Days',
+  rate_7days: '7 Days', rate_15days: '15 Days', rate_1month: '1 Month',
+  rate_3months: '3 Months',
+};
+
 const emptyForm = {
   bookingDate: getToday(),
   bookingTime: getCurrentTime12hr(),
@@ -213,14 +221,6 @@ export default function BookingSheet({ session, profile, setActivePage }) {
     });
 
   useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
-
-  const RATE_COLUMN_TO_LABEL = {
-    rate_3hr: '3 Hr', rate_6hr: '6 Hr', rate_12hr: '12 Hr',
-    rate_1day: '1 Day', rate_2days: '2 Days', rate_3days: '3 Days',
-    rate_4days: '4 Days', rate_5days: '5 Days', rate_6days: '6 Days',
-    rate_7days: '7 Days', rate_15days: '15 Days', rate_1month: '1 Month',
-    rate_3months: '3 Months',
-  };
 
   useEffect(() => {
     if (!isOwner && profileCentre) {
