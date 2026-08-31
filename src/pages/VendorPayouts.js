@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 function getCurrentMonth() {
@@ -216,91 +216,57 @@ export default function VendorPayouts({ profile, setActivePage }) {
         <button onClick={loadAll} style={btnSecondary}>{loading ? 'Loading...' : 'Refresh'}</button>
       </div>
 
-      {/* STATEMENT TABLE — desktop */}
+      {/* STATEMENT — one card per vendor, small table per card (no shared sticky-header CSS, works at any width) */}
       <div className="br-form-card">
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>Revenue Sharing Statement</h2>
-        <div className="desktop-table">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr>
-                {['Vehicle Name', 'Reg. No.', 'Attached By', 'Credit ₹', 'GST 6% ₹', 'Credit after GST ₹', 'Parking ₹', 'Maint. Debit ₹', 'Amount Left ₹', '% Owner', 'Owner Amt ₹', 'BJ Earn ₹'].map(h => (
-                  <th key={h} style={th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {vendorGroups.length === 0 ? (
-                <tr><td colSpan={12} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>{loading ? 'Loading...' : 'No vehicles for this filter.'}</td></tr>
-              ) : vendorGroups.map(g => (
-                <Fragment key={g.vendor.id}>
-                  {g.rows.map(({ vv, calc }) => (
-                    <tr key={vv.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={tdStyle}>{vv.vehicles.vehicle_types?.name || '—'}</td>
-                      <td style={{ ...tdStyle, fontWeight: '600' }}>{vv.vehicles.registration_number}</td>
-                      <td style={tdStyle}>{g.vendor.name}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.credit)}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.gst)}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.creditAfterGst)}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.parking)}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.maintenance)}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.amountLeft)}</td>
-                      <td style={tdStyle}>{Math.round(calc.pct * 100)}%</td>
-                      <td style={tdStyle}>₹{formatINR(calc.ownerAmt)}</td>
-                      <td style={tdStyle}>₹{formatINR(calc.bjEarn)}</td>
-                    </tr>
-                  ))}
-                  <tr key={`${g.vendor.id}-subtotal`} style={{ borderBottom: '2px solid #1a56a0', background: '#f0f4ff', fontWeight: '700' }}>
-                    <td style={tdStyle} colSpan={10}>{g.vendor.name} — Subtotal</td>
-                    <td style={tdStyle}>₹{formatINR(g.subtotalOwner)}</td>
-                    <td style={tdStyle}>₹{formatINR(g.subtotalBJ)}</td>
-                  </tr>
-                </Fragment>
-              ))}
-              {vendorGroups.length > 0 && (
-                <tr style={{ background: '#1a56a0', color: 'white', fontWeight: '700' }}>
-                  <td style={tdStyle} colSpan={10}>Grand Total</td>
-                  <td style={tdStyle}>₹{formatINR(grandTotalOwner)}</td>
-                  <td style={tdStyle}>₹{formatINR(grandTotalBJ)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* STATEMENT — mobile cards */}
-        <div className="mobile-cards">
-          {vendorGroups.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>{loading ? 'Loading...' : 'No vehicles for this filter.'}</p>
-          ) : vendorGroups.map(g => (
-            <div key={g.vendor.id} style={{ marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '14px', color: '#1a56a0', marginBottom: '8px' }}>{g.vendor.name}</h3>
-              {g.rows.map(({ vv, calc }) => (
-                <div key={vv.id} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px', marginBottom: '10px', background: 'white' }}>
-                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#1a56a0', marginBottom: '4px' }}>
-                    {vv.vehicles.vehicle_types?.name || '—'} · {vv.vehicles.registration_number}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#555', lineHeight: '1.8' }}>
-                    Credit: ₹{formatINR(calc.credit)} &nbsp;·&nbsp; GST 6%: ₹{formatINR(calc.gst)}<br/>
-                    Credit after GST: ₹{formatINR(calc.creditAfterGst)}<br/>
-                    Parking: ₹{formatINR(calc.parking)} &nbsp;·&nbsp; Maint. Debit: ₹{formatINR(calc.maintenance)}<br/>
-                    Amount Left: ₹{formatINR(calc.amountLeft)} &nbsp;·&nbsp; Owner %: {Math.round(calc.pct * 100)}%
-                  </div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a56a0', marginTop: '6px' }}>
-                    Owner Amt: ₹{formatINR(calc.ownerAmt)} &nbsp;·&nbsp; BJ Earn: ₹{formatINR(calc.bjEarn)}
+        {vendorGroups.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>{loading ? 'Loading...' : 'No vehicles for this filter.'}</p>
+        ) : (
+          <>
+            {vendorGroups.map(g => (
+              <div key={g.vendor.id} style={{ marginBottom: '16px', border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', padding: '10px 16px', background: '#f0f4ff', borderBottom: '1px solid #dbe4f5' }}>
+                  <h3 style={{ fontSize: '15px', color: '#1a56a0', margin: 0 }}>{g.vendor.name}</h3>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a56a0' }}>
+                    Owner: ₹{formatINR(g.subtotalOwner)} &nbsp;·&nbsp; BJ Earn: ₹{formatINR(g.subtotalBJ)}
                   </div>
                 </div>
-              ))}
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a56a0', padding: '8px', background: '#f0f4ff', borderRadius: '8px' }}>
-                Subtotal — Owner: ₹{formatINR(g.subtotalOwner)} · BJ: ₹{formatINR(g.subtotalBJ)}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        {['Vehicle', 'Reg. No.', 'Credit ₹', 'GST 6% ₹', 'After GST ₹', 'Parking ₹', 'Maint. ₹', 'Left ₹', '% Owner', 'Owner Amt ₹', 'BJ Earn ₹'].map(h => (
+                          <th key={h} style={th}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.rows.map(({ vv, calc }) => (
+                        <tr key={vv.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                          <td style={tdStyle}>{vv.vehicles.vehicle_types?.name || '—'}</td>
+                          <td style={{ ...tdStyle, fontWeight: '600' }}>{vv.vehicles.registration_number}</td>
+                          <td style={tdStyle}>₹{formatINR(calc.credit)}</td>
+                          <td style={tdStyle}>₹{formatINR(calc.gst)}</td>
+                          <td style={tdStyle}>₹{formatINR(calc.creditAfterGst)}</td>
+                          <td style={tdStyle}>₹{formatINR(calc.parking)}</td>
+                          <td style={tdStyle}>₹{formatINR(calc.maintenance)}</td>
+                          <td style={tdStyle}>₹{formatINR(calc.amountLeft)}</td>
+                          <td style={tdStyle}>{Math.round(calc.pct * 100)}%</td>
+                          <td style={{ ...tdStyle, fontWeight: '600', color: '#1a56a0' }}>₹{formatINR(calc.ownerAmt)}</td>
+                          <td style={{ ...tdStyle, fontWeight: '600', color: '#059669' }}>₹{formatINR(calc.bjEarn)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', padding: '14px 18px', background: '#1a56a0', color: 'white', borderRadius: '10px', fontWeight: '700', fontSize: '14px' }}>
+              <span>Grand Total</span>
+              <span>Owner: ₹{formatINR(grandTotalOwner)} &nbsp;·&nbsp; BJ Earn: ₹{formatINR(grandTotalBJ)}</span>
             </div>
-          ))}
-          {vendorGroups.length > 0 && (
-            <div style={{ fontSize: '14px', fontWeight: '700', color: 'white', background: '#1a56a0', padding: '10px', borderRadius: '8px' }}>
-              Grand Total — Owner: ₹{formatINR(grandTotalOwner)} · BJ: ₹{formatINR(grandTotalBJ)}
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {/* VENDOR MANAGEMENT */}
