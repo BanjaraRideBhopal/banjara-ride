@@ -18,8 +18,8 @@
 - No backend — frontend only
 - Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
-## Current Build Status (as of 2026-08-17)
-- Phases 1–14 of multi-centre build are complete and live
+## Current Build Status (as of 2026-08-31)
+- Phases 1–15 of multi-centre build are complete and live
 - Phase 1: DB migration — centres, vehicle_types, vehicles tables seeded; bookings/customers restructured with centre_id
 - Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
@@ -43,6 +43,9 @@
 - Phase 14: Rate Groups. Rates now live per `(vehicle_type, rate_group)` combination in a new `vehicle_type_rates` table, not globally on `vehicle_types` — lets the same vehicle type (e.g. Activa) have different prices at different rate groups (Company Owned vs IISER). `vehicle_types` rate columns are **deprecated** (kept, unused by app logic, reference only). Every vehicle now has a `rate_group_id`; rate lookups in `BookingSheet.js` (initial booking auto-fill, duration dropdown filtering, and close-booking extra-charge calculations) all resolve via `(selected vehicle's own vehicle_type_id, its registration's rate_group_id)`, not the vehicle type alone. Missing rate card → inline warning, blank rent/deposit, blocked save. `VehicleMaster.js` gained: a Rate Group column, a full edit form (registration + active for staff, + vehicle type + rate group + centre for super_admin, with duplicate-registration validation), a Rate Group field on Add Vehicle (auto-defaulted from centre), and a super_admin-only Rate Cards management section (add/edit rate cards, no delete). **Vehicle Master is now reachable by staff too** (was super_admin-only) — `App.js` routing and the `BookingSheet.js` nav link both opened up; a new `vehicles_update_staff_own_centre` RLS policy lets staff UPDATE vehicles in their own centre (DB-level scoping is by row/centre only, not by column — the UI is what limits staff to Registration+Active).
   - Post-ship cleanup (2026-08-17): Step 3c's migration copied *every* vehicle type into a Company Owned rate card, including two that are actually IISER-only in practice — `VEHICLE BHAURI` (a pure IISER placeholder type) and `Access 125` (only ever registered at IISER, MP04SQ7201). VEHICLE BHAURI's Company Owned card was unused dead data — deleted (0 company vehicles used that type). Access 125's Company Owned card was **reassigned to IISER** instead of deleted, since Access 125 had no IISER card yet (the exact gap flagged at ship time) — this single UPDATE both removed the wrong Company Owned entry and created the IISER card MP04SQ7201 needed, reusing its real existing rates rather than inventing new ones. MP04SQ7201 no longer shows the "no rate card" warning.
   - Post-ship addition (2026-08-17): the vehicle Edit form's Vehicle Type dropdown only ever listed existing `vehicle_types` — no way to correct a vehicle to a genuinely new type (e.g. relabeling a `VEHICLE BHAURI` placeholder to a real type like "Maestro") without first creating that type elsewhere. Rather than crowd a "+ Add new type..." sub-form into the compact per-row edit table, the capability was added to the roomier **Rate Cards → Add Rate Card** form instead: its Vehicle Type dropdown gained the same `__new__` sentinel + inline Type Name field pattern as the Add Vehicle form, so `saveAddRateCard()` can insert a fresh `vehicle_types` row before the `vehicle_type_rates` insert. Two-step flow for a correction like this: (1) Rate Cards → Add Rate Card → "+ Add new type..." → create the type + its rate card for the right rate group; (2) then edit the vehicle normally — the new type now appears in its dropdown.
+- Phase 15: Vendor Attachment & Revenue Sharing. New `vendors` (15 rows) and `vendor_vehicles` (57 rows, `UNIQUE(vehicle_id)`) tables — links a vehicle registration to an external owner with a monthly revenue-share `owner_share_pct` and a fixed `parking_charge` (default ₹1000). New `src/pages/VendorPayouts.js` (super_admin only, `BookingSheet.js` nav link + `App.js` routing on `activePage === 'vendorpayouts'`): a month-picker + vendor-filter statement table, one row per active `vendor_vehicles` entry, grouped by vendor with subtotal + grand total rows. Per vehicle per month: `Credit` = SUM(`final_rent`) for that registration's `status='end'` bookings in the month → `GST 6%` → `Credit after GST` → minus `Parking Charge` and SUM(`maintenance_expenses.amount`) for that vehicle in the month → `Amount Left` → split by `owner_share_pct` into `Owner Amt` / `BJ Earn`. BanjaRide LLP's 15 company-owned vehicles are seeded with `owner_share_pct = 0`, so they appear in the statement like everyone else with Owner Amt = ₹0 — no special-casing needed. Vehicles with no bookings in the month still show (Credit = ₹0, parking still deducted). Below the statement: a Vendors management section (add/edit name+phone+notes, no delete) and a Vendor Vehicles section (reassign vendor, edit share %/parking/attached date/active — no delete, detach via `active=false`). `attached_date` is nullable and was seeded `NULL` for all 57 rows — the source vendor sheet had per-vehicle revenue shares but no usable per-vehicle date data; can be backfilled later via the edit UI if wanted.
+  - Migration note: the draft spec (`.claude/specs/phase-15-vendor-payouts.md`) originally used `SERIAL`/`INT` for the new tables' PKs/FKs — corrected to `BIGINT` before running, matching every other table in this DB (`vehicles.id`, `vehicle_types.id`, `rate_groups.id`, etc.) — the fourth time this exact spec-vs-live-schema mismatch has been caught in this project.
+  - Verification gap caught before seeding: the spec's original vehicle-sheet check (2026-08-17) found 2 missing registrations; a full re-verification on 2026-08-31 (right before implementation) found 2 *more* it had missed — `MP04UJ5183` and `MP04UP2944` (both Rishabh Tiwari, Activa 6G, Company Owned, Sonagiri) — added via SQL before the `vendor_vehicles` seed ran, so all 57 sheet registrations resolved cleanly with no orphaned rows.
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -51,6 +54,7 @@
 - src/pages/VehicleMaster.js — Vehicle admin: assign centres/rate groups, mark inactive, add registrations, add new vehicle types inline, manage rate cards. Reachable by all logged-in users as of Phase 14 (was super_admin-only) — staff get a reduced edit form (registration + active only) and no Add Vehicle / Rate Cards access
 - src/pages/Maintenance.js — Vehicle maintenance/insurance/battery tracking (all users, group-shared RLS)
 - src/pages/Dashboard.js — Analytics dashboard with Recharts (super_admin only)
+- src/pages/VendorPayouts.js — Vendor revenue-sharing statement + vendor/vendor-vehicle management (super_admin only)
 - src/data/options.js — All dropdown options including booking types, centreOptions, payment options
 - src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
 - src/pages/BookingSheet.js — Main booking form; accepts { session, profile } props
@@ -124,7 +128,12 @@
 - refund_amount, refund_status, refund_by, created_at
 - Legacy/unused: num_days, num_weeks (TEXT — predate centre restructure, not read or written by current code)
 
-## RLS (live as of 2026-08-17)
+### vendors / vendor_vehicles (Phase 15)
+- `vendors`: `id BIGINT GENERATED BY DEFAULT AS IDENTITY PK`, `name TEXT NOT NULL`, `phone TEXT`, `notes TEXT`, `created_at`. 15 rows (external owners; excludes Akash Thakur — 0 vehicles, reassigned to Anita Thakur).
+- `vendor_vehicles`: `id BIGINT identity PK`, `vehicle_id BIGINT NOT NULL FK → vehicles`, `vendor_id BIGINT NOT NULL FK → vendors`, `owner_share_pct NUMERIC NOT NULL` (e.g. `0.5` = 50%), `parking_charge NUMERIC NOT NULL DEFAULT 1000`, `attached_date DATE` (nullable — seeded `NULL` for all 57 rows, no source data), `active BOOLEAN NOT NULL DEFAULT true`, `created_at`. `UNIQUE(vehicle_id)` — one vendor per vehicle at a time. 57 rows, one per vehicle on the vendor sheet including the 15 BanjaRide LLP (company-owned, `owner_share_pct = 0`) vehicles.
+- Detaching a vehicle from a vendor = set `active = false`, not delete (no delete policy on either table).
+
+## RLS (live as of 2026-08-31)
 - Helper functions: `public.get_my_centre_id()`, `public.is_super_admin()`, `public.is_franchise_user()` — security definer, stable, granted to authenticated only
 - bookings: staff select/insert/update own centre only; super_admin all; anon blocked
 - customers: all authenticated can read/write — global pool, one mobile = one customer across all centres; anon blocked
@@ -133,6 +142,7 @@
 - rate_groups / vehicle_type_rates (Phase 14): all authenticated can select; super_admin can write (`FOR ALL`, covers insert/update/delete)
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 - maintenance_expenses / insurance_records / battery_records (Phase 11): SELECT + INSERT mirror `vehicles`' group-sharing logic — company staff see/write all company-centre records regardless of which company centre logged them; franchise (IISER) staff see/write only their own centre; super_admin all. No UPDATE policy (no edit feature). DELETE (Phase 12b): `super_admin_delete` policy on all 3 tables, `USING (is_super_admin())` — staff cannot delete. No explicit anon-deny policy needed — RLS enabled + zero anon policies already default-denies, same as bookings/vehicles.
+- vendors / vendor_vehicles (Phase 15): all authenticated can select; super_admin can write (`FOR ALL`, covers insert/update/delete) — simple centre-agnostic policy, unlike the group-sharing pattern above, since vendor payouts aren't scoped by centre.
 
 ## Vehicles (22 types, rate groups now per (type, group) — see Phase 14)
 Vehicle data is now loaded from the `vehicle_types` + `vehicles` + `vehicle_type_rates` + `rate_groups` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
