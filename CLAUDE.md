@@ -272,14 +272,8 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 
 ---
 
-## Contribution Workflow (as of 2026-11-09)
-A second contributor (teammate) joined the project. Nothing should reach production without owner review:
-- **Never push directly to `main`.** Work on a feature branch, open a PR into `main`.
-- Every PR into `main` auto-builds via GitHub Actions (`.github/workflows/build.yml` — `npm ci && npm run build`), so a broken build is caught before merge, not after.
-- Vercel auto-builds a separate **preview deployment URL** for every branch/PR push (distinct from the `banjara-ride.vercel.app` production domain, which only redeploys from `main`) — no extra setup needed, this is Vercel's default behaviour. Review a PR by opening its preview link before merging.
-- Owner reviews and merges the PR; that merge is what triggers the production deploy.
-- Branch protection on `main` (require PR + review, no direct pushes) should be enabled in GitHub repo settings — needs repo admin access to configure.
-- No separate staging Supabase project / DB branching (explicitly declined — avoiding paid Supabase features). One shared DB for dev and prod — so the existing rule below (no migration without exact SQL shown + explicit owner approval) is the only DB safety net, and applies regardless of who's proposing the change.
+## CI Build Check
+`.github/workflows/build.yml` runs `npm ci && npm run build` on every push to `main` and every PR into it — catches a broken build (Vercel treats ESLint warnings as build errors) automatically, independent of who's pushing.
 
 ## Development Approach
 - Requirements first, then build — step by step, one feature at a time
