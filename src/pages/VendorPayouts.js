@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { buildCreditByReg, buildMaintenanceByVehicleId, computeVendorRow } from '../utils/vendorRevenue';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -65,25 +66,9 @@ export default function VendorPayouts({ profile, setActivePage }) {
   }
 
   // ── Statement calculation ──────────────────────────
-  const creditByReg = {};
-  bookings.forEach(b => { creditByReg[b.vehicle_number] = (creditByReg[b.vehicle_number] || 0) + (parseFloat(b.final_rent) || 0); });
-
-  const maintenanceByVehicleId = {};
-  expenses.forEach(e => { maintenanceByVehicleId[e.vehicle_id] = (maintenanceByVehicleId[e.vehicle_id] || 0) + (parseFloat(e.amount) || 0); });
-
-  function computeRow(vv) {
-    const reg = vv.vehicles.registration_number;
-    const credit = creditByReg[reg] || 0;
-    const gst = credit * 0.06;
-    const creditAfterGst = credit - gst;
-    const parking = parseFloat(vv.parking_charge) || 0;
-    const maintenance = maintenanceByVehicleId[vv.vehicle_id] || 0;
-    const amountLeft = creditAfterGst - parking - maintenance;
-    const pct = parseFloat(vv.owner_share_pct) || 0;
-    const ownerAmt = amountLeft * pct;
-    const bjEarn = amountLeft - ownerAmt;
-    return { credit, gst, creditAfterGst, parking, maintenance, amountLeft, pct, ownerAmt, bjEarn };
-  }
+  const creditByReg = buildCreditByReg(bookings);
+  const maintenanceByVehicleId = buildMaintenanceByVehicleId(expenses);
+  function computeRow(vv) { return computeVendorRow(vv, creditByReg, maintenanceByVehicleId); }
 
   const activeVV = vendorVehicles.filter(vv => vv.active && vv.vehicles);
   const filteredVV = vendorFilter === 'all' ? activeVV : activeVV.filter(vv => String(vv.vendor_id) === vendorFilter);
