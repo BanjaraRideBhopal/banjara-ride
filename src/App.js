@@ -6,6 +6,7 @@ import VehicleMaster from './pages/VehicleMaster';
 import Maintenance from './pages/Maintenance';
 import Dashboard from './pages/Dashboard';
 import VendorPayouts from './pages/VendorPayouts';
+import Accounts from './pages/Accounts';
 
 function App() {
   const [authStatus, setAuthStatus] = useState('loading');
@@ -64,6 +65,9 @@ function App() {
   }
   if (activePage === 'vendorpayouts' && profile.role === 'super_admin') {
     return <VendorPayouts profile={profile} setActivePage={setActivePage} />;
+  }
+  if (activePage === 'accounts' && profile.role === 'super_admin') {
+    return <Accounts profile={profile} setActivePage={setActivePage} />;
   }
   return <BookingSheet session={session} profile={profile} setActivePage={setActivePage} />;
 }

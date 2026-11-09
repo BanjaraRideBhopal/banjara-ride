@@ -1013,6 +1013,12 @@ export default function BookingSheet({ session, profile, setActivePage }) {
             </button>
           )}
 
+          {isOwner && (
+            <button onClick={() => setActivePage('accounts')} style={btnSecondary}>
+              Accounts
+            </button>
+          )}
+
           <button onClick={() => {
             if (showForm && editingId) { setEditingId(null); setForm({ ...emptyForm, bookingDate: getToday(), bookingTime: getCurrentTime12hr(), centre: isOwner ? '' : profileCentre }); }
             setShowForm(!showForm);
