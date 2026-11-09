@@ -35,6 +35,8 @@ export const paidToOptions = [
   "Manish",
   "Guard",
   "Nazim",
+  "Amaan",
+  "Rajkumar",
   "Banjara Ride",
 ];
 
@@ -58,5 +60,7 @@ export const refundByOptions = [
   "Manish",
   "Guard",
   "Nazim",
+  "Amaan",
+  "Rajkumar",
   "Banjara Ride",
 ];
