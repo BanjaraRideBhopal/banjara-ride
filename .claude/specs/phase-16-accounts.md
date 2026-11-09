@@ -1,6 +1,6 @@
 # Phase 16 — Accounts (Business-Wide Expenses, Income & Profit)
 
-**Status:** APPROVED (2026-11-09) — all §9 Human Gate items resolved below. Ready for implementation.
+**Status:** IMPLEMENTED (2026-11-09). All DB steps run and verified, `src/utils/vendorRevenue.js` extracted and `VendorPayouts.js` refactored (spot-checked identical output), `src/pages/Accounts.js` built and routed, `npm run build` clean with `Accounts.js` genuinely bundled (verified by hash change after wiring routing — an unrouted file isn't linted by CRA). Pushed as `962cf64` (util extraction) and `fa8fd1a` (Accounts page + routing).
 **Date:** November 2026
 **Source of truth:** `CLAUDE.md`, `MULTI_CENTRE_SPEC.md`, `src/pages/VendorPayouts.js` (Phase 15 — this phase's primary dependency), `src/pages/Dashboard.js` (Phase 12 — chart patterns), `src/pages/VehicleMaster.js` (Phase 8a/14 — `__new__` inline-add pattern)
 

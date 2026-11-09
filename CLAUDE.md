@@ -18,8 +18,8 @@
 - No backend — frontend only
 - Always run `npm run build` before pushing — Vercel treats ESLint warnings as build errors
 
-## Current Build Status (as of 2026-08-31)
-- Phases 1–15 of multi-centre build are complete and live
+## Current Build Status (as of 2026-11-09)
+- Phases 1–16 of multi-centre build are complete and live
 - Phase 1: DB migration — centres, vehicle_types, vehicles tables seeded; bookings/customers restructured with centre_id
 - Phase 2: Auth foundation — 4 Supabase Auth accounts + profiles table + RLS helper functions
 - Phase 3: RLS live on all 6 tables (per-centre data isolation, anon access fully blocked)
@@ -47,6 +47,7 @@
   - Migration note: the draft spec (`.claude/specs/phase-15-vendor-payouts.md`) originally used `SERIAL`/`INT` for the new tables' PKs/FKs — corrected to `BIGINT` before running, matching every other table in this DB (`vehicles.id`, `vehicle_types.id`, `rate_groups.id`, etc.) — the fourth time this exact spec-vs-live-schema mismatch has been caught in this project.
   - Verification gap caught before seeding: the spec's original vehicle-sheet check (2026-08-17) found 2 missing registrations; a full re-verification on 2026-08-31 (right before implementation) found 2 *more* it had missed — `MP04UJ5183` and `MP04UP2944` (both Rishabh Tiwari, Activa 6G, Company Owned, Sonagiri) — added via SQL before the `vendor_vehicles` seed ran, so all 57 sheet registrations resolved cleanly with no orphaned rows.
   - Post-ship fix (2026-08-31): the statement table originally reused the `.desktop-table` CSS class's sticky-header rules, which are built for `BookingSheet.js`'s two-row `<thead>` — with only one header row here, both the `:first-child` (top:0) and `:last-child` (top:40px) selectors matched the same row and the latter won, pushing the header down and visually covering the row beneath it (looked like a vendor's first vehicle was missing) plus an overlap glitch on scroll. Restructured into one bordered card per vendor (name + Owner/BJ Earn subtotal in the card header, a small `overflowX:auto` table of that vendor's vehicles underneath) instead of one flat table with interleaved subtotal rows — also drops the now-redundant "Attached By" column and the separate desktop/mobile render paths (the per-vendor tables scroll horizontally on their own on narrow screens).
+- Phase 16: Accounts (business-wide expenses, income, profit). New `expense_categories` (8 seed rows, admin-extensible via inline "+ Add new category..." — mirrors `VehicleMaster.js`'s `__new__` sentinel pattern), `expenses` (category_id, amount, expense_date, description — no `centre_id`, category names like "Sonagiri Operations"/"RKMP Operations" already encode centre scope where relevant), and `income_records` (`income_type` CHECK IN `('subsidy','other')`, amount, income_date, description — no vehicle linkage) tables. **RLS deviation, explicit and intentional:** unlike every other admin-facing table in this app (`vendors`, `vendor_vehicles`, `rate_groups`, `vehicle_type_rates` all let any authenticated user read), `expenses` and `income_records` have a single `FOR ALL USING (is_super_admin())` policy and **no `read_all` policy** — staff cannot read this data even via a direct Supabase API call, given HR/salary and other financial sensitivity. `expense_categories` keeps the normal read_all pattern (holds no amounts). New `src/pages/Accounts.js` (super_admin only, `BookingSheet.js` nav link + `App.js` routing on `activePage === 'accounts'`): single month-picker, a Profit Summary panel (`BJ Earn (sum) + Govt Subsidy (sum) + Other Income (sum) − All Expenses (sum)`), expense/income entry forms + tables (inline edit, super_admin delete — mirrors `Maintenance.js`'s Phase 12b delete pattern), and 5 charts/tables: Maintenance per month and Vendor Rent (Owner Amt) per month and Govt Subsidy per month are line-chart trends over a trailing 6 months; Expenses by Category is a bar chart for the selected month only; Per-Vehicle Earn is a plain sorted table (not a chart — 57 vehicles is too many bars to read), descending by BJ Earn. "BJ Earn" and "Rent paid to vendor" are not new data — both reuse the exact Phase 15 formula via a new shared `src/utils/vendorRevenue.js` (`buildCreditByReg`, `buildMaintenanceByVehicleId`, `computeVendorRow`), extracted from `VendorPayouts.js` so the two pages don't duplicate the calculation — `VendorPayouts.js`'s own output is unchanged (pure refactor, numerically spot-checked identical before/after).
 - Next: Phase 6b — Employees admin page (hardcoded paidToOptions → DB-driven per centre)
 
 ## Key Files
@@ -56,6 +57,8 @@
 - src/pages/Maintenance.js — Vehicle maintenance/insurance/battery tracking (all users, group-shared RLS)
 - src/pages/Dashboard.js — Analytics dashboard with Recharts (super_admin only)
 - src/pages/VendorPayouts.js — Vendor revenue-sharing statement + vendor/vendor-vehicle management (super_admin only)
+- src/pages/Accounts.js — Business-wide expenses/income, profit summary, trend charts (super_admin only; `expenses`/`income_records` are super_admin-only at the RLS level too, not just the page)
+- src/utils/vendorRevenue.js — Shared BJ Earn / Owner Amt calculation, used by both VendorPayouts.js and Accounts.js
 - src/data/options.js — All dropdown options including booking types, centreOptions, payment options
 - src/utils/calculations.js — Auto-calculation logic (return datetime, rent, KM)
 - src/pages/BookingSheet.js — Main booking form; accepts { session, profile } props
@@ -134,7 +137,13 @@
 - `vendor_vehicles`: `id BIGINT identity PK`, `vehicle_id BIGINT NOT NULL FK → vehicles`, `vendor_id BIGINT NOT NULL FK → vendors`, `owner_share_pct NUMERIC NOT NULL` (e.g. `0.5` = 50%), `parking_charge NUMERIC NOT NULL DEFAULT 1000`, `attached_date DATE` (nullable — seeded `NULL` for all 57 rows, no source data), `active BOOLEAN NOT NULL DEFAULT true`, `created_at`. `UNIQUE(vehicle_id)` — one vendor per vehicle at a time. 57 rows, one per vehicle on the vendor sheet including the 15 BanjaRide LLP (company-owned, `owner_share_pct = 0`) vehicles.
 - Detaching a vehicle from a vendor = set `active = false`, not delete (no delete policy on either table).
 
-## RLS (live as of 2026-08-31)
+### expense_categories / expenses / income_records (Phase 16)
+- `expense_categories`: `id BIGINT identity PK`, `name TEXT UNIQUE NOT NULL`, `created_at`. 8 seed rows (Sonagiri Operations, RKMP Operations, Tech/Application, Marketing, Loans and EMI, Damage & Lost, HR/Employee Salary, CA/GST/ITR Expenses), admin-extensible.
+- `expenses`: `id BIGINT identity PK`, `category_id BIGINT NOT NULL FK → expense_categories`, `amount NUMERIC NOT NULL`, `expense_date DATE NOT NULL`, `description TEXT`, `created_at`. No `centre_id` (by design — category name encodes centre scope where relevant).
+- `income_records`: `id BIGINT identity PK`, `income_type TEXT NOT NULL CHECK IN ('subsidy','other')`, `amount NUMERIC NOT NULL`, `income_date DATE NOT NULL`, `description TEXT`, `created_at`. No vehicle linkage (subsidy is a lump sum, not per-vehicle).
+- `expenses`/`income_records` both support super_admin delete (`window.confirm()` then delete, no reload) — see RLS below for why this needed no extra DDL.
+
+## RLS (live as of 2026-11-09)
 - Helper functions: `public.get_my_centre_id()`, `public.is_super_admin()`, `public.is_franchise_user()` — security definer, stable, granted to authenticated only
 - bookings: staff select/insert/update own centre only; super_admin all; anon blocked
 - customers: all authenticated can read/write — global pool, one mobile = one customer across all centres; anon blocked
@@ -144,6 +153,8 @@
 - profiles: each user sees own row; super_admin sees all; no writes via API (service role only)
 - maintenance_expenses / insurance_records / battery_records (Phase 11): SELECT + INSERT mirror `vehicles`' group-sharing logic — company staff see/write all company-centre records regardless of which company centre logged them; franchise (IISER) staff see/write only their own centre; super_admin all. No UPDATE policy (no edit feature). DELETE (Phase 12b): `super_admin_delete` policy on all 3 tables, `USING (is_super_admin())` — staff cannot delete. No explicit anon-deny policy needed — RLS enabled + zero anon policies already default-denies, same as bookings/vehicles.
 - vendors / vendor_vehicles (Phase 15): all authenticated can select; super_admin can write (`FOR ALL`, covers insert/update/delete) — simple centre-agnostic policy, unlike the group-sharing pattern above, since vendor payouts aren't scoped by centre.
+- expense_categories (Phase 16): normal pattern, all authenticated can select, super_admin can write — holds category names only, no amounts.
+- expenses / income_records (Phase 16): **deliberately stricter than every other table in this app** — a single `FOR ALL USING (is_super_admin())` policy and no `read_all` policy at all, so staff cannot read this data even via a direct Supabase API call (not just hidden by the admin-only page). `FOR ALL` with only a `USING` clause (no separate `WITH CHECK` needed beyond matching) already covers DELETE, which is why adding super_admin delete to these tables required zero DDL change — only a UI button.
 
 ## Vehicles (22 types, rate groups now per (type, group) — see Phase 14)
 Vehicle data is now loaded from the `vehicle_types` + `vehicles` + `vehicle_type_rates` + `rate_groups` Supabase tables at runtime, not from src/data/vehicles.js (that file still exists but is unused).
