@@ -217,7 +217,7 @@ Each is a fixed option with a fixed rate — no number picker needed.
 - Refund By (single): removed from UI (Phase 7b). DB column kept for historic data.
 - Refund split: Refund Cash ₹ → Cash Refund By (when > 0) → Refund UPI ₹ → UPI Refund By (when > 0) → Refund App Payment ₹
 - Refund match indicator: same green/amber/red logic as payment indicator, compares Refund Amount vs sum of split refund fields
-- Staff list (Paid To / Refund By): Lokendra, Rizwan, Risabh Tiwari, Manish, Guard, Nazim, Banjara Ride
+- Staff list (Paid To / Refund By): Lokendra, Rizwan, Risabh Tiwari, Manish, Guard, Nazim, Amaan, Rajkumar, Banjara Ride
 - Booking form has autoComplete="off"; Login form does NOT (allows browser to save centre passwords)
 
 ## Date Filter & Search
