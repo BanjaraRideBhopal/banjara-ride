@@ -368,4 +368,27 @@ Visual only — no data was ever actually missing, it was hidden under the mispo
 
 ---
 
-*Last updated: 2026-11-09*
+## BUG-013 — Profit Summary showed a falsely negative figure for high-volume months
+
+**Status:** Fixed
+**Found:** 2026-11-10
+**File:** `src/pages/Accounts.js`
+
+### What happened
+The owner reported October's Profit figure showing negative, despite October having real, substantial bookings (849 closed bookings, ₹486,212 total rent).
+
+### Root cause
+`loadAll()` fetched one 6-month trailing window of `bookings`/`maintenance_expenses` (needed for the 3 trend charts) and reused that same array — filtered client-side down to the selected month — for the Profit Summary panel and Per Vehicle Earn table too. At this business's booking volume (~800-900 closed bookings a month), a 6-month window comfortably exceeds Supabase's default 1000-row response cap per request (confirmed: 2645 rows fell in the May–October window). The request silently returns a truncated subset rather than erroring, so whichever months lost out in that truncation showed under-counted credit — deflating BJ Earn enough to flip October's Profit negative even though the real underlying numbers were strongly positive.
+
+### Fix
+The Profit panel and Per Vehicle Earn table now run a dedicated single-month query for `bookings`/`maintenance_expenses` (same safe pattern `VendorPayouts.js` already used — a single month's volume is comfortably under the row cap). The wider 6-month window fetch is kept only for the 3 trend charts (lower stakes than the Profit figure itself), with an explicit `.limit(10000)` added as a safety margin against the same truncation risk as booking volume keeps growing.
+
+### Why it occurred
+Supabase/PostgREST silently caps `.select()` results at 1000 rows by default instead of erroring — a well-known but easy-to-miss gotcha. The bug was introduced by reusing one fetch for two purposes with very different accuracy requirements (an approximate trend line vs. an exact financial total) without considering that the larger one could silently drop data for the smaller one.
+
+### Flow impact
+Profit, BJ Earn, and Per Vehicle Earn are now accurate for every month regardless of booking volume. Trend charts still carry the same (now explicitly bounded, currently generous) row-cap risk as the business's booking volume grows further — revisit the `.limit(10000)` ceiling if it's ever approached.
+
+---
+
+*Last updated: 2026-11-10*
