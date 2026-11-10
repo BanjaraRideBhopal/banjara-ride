@@ -296,4 +296,76 @@ Editing a booking from Active Bookings now updates the displayed row immediately
 
 ---
 
-*Last updated: 2026-07-29*
+## BUG-010 — Creating a new vehicle type fails with NOT NULL violation
+
+**Status:** Fixed
+**Found:** 2026-08-17
+**File:** `src/pages/VehicleMaster.js`
+
+### What happened
+Saving a new vehicle type via either the Add Vehicle form's "+ Add new type..." flow or the Rate Cards "+ Add new type..." flow failed with:
+> `null value in column "late_charge_per_hour" of relation "vehicle_types" violates not-null constraint`
+
+### Root cause
+Phase 14 made `vehicle_type_rates` the real source of truth for rates, and marked `vehicle_types.security_deposit`/`late_charge_per_hour`/rate columns as deprecated reference-only data. The Phase 14 rewrite of both new-type insert flows followed that framing literally and only sent `name` to the `vehicle_types` insert — but the live DB columns were never relaxed, so `security_deposit`/`late_charge_per_hour` are still `NOT NULL`.
+
+### Fix
+Both insert flows now also populate `security_deposit`/`late_charge_per_hour` on the `vehicle_types` insert, using the same values entered for the real `vehicle_type_rates` card.
+
+### Why it occurred
+"Deprecated, kept as reference" was read as "no longer constrained" without checking the live column definition. Been broken in the Add Vehicle form since the Phase 14 push itself — nobody had tried adding a new type through the UI until this bug surfaced it, 3 weeks later.
+
+### Flow impact
+New vehicle type creation now works via both entry points. No data correction needed — the bug blocked the insert entirely, so no bad rows exist.
+
+---
+
+## BUG-011 — Booking form blanks to a white screen on selecting a vehicle
+
+**Status:** Fixed
+**Found:** 2026-08-17
+**File:** `src/pages/BookingSheet.js`
+
+### What happened
+Selecting a vehicle (immediately for single-registration types; on picking the registration for multi-registration types) blanked the entire booking page to white, with no visible error in the UI.
+
+### Root cause
+`RATE_COLUMN_TO_LABEL` was declared with `const` partway through the component body (~line 217), but `rateCardToVehicle()` — called from a derived `const` near the top of the component (~line 202), which runs on every render — reads that object whenever a valid rate card is found. A classic temporal-dead-zone `ReferenceError`: the binding exists (hoisted to the top of the function's scope) but is uninitialized at the point it's read, since the component hadn't reached its declaration line yet in that render pass.
+
+This broke virtually every real vehicle+registration selection that resolved to a valid rate card — live since the Phase 14 push itself (same day), undetected until the owner tested live and reported it with the browser console error.
+
+### Fix
+Moved `RATE_COLUMN_TO_LABEL` to module scope, above the component — it's a static mapping, not per-render state, so it never needed to live inside the component body.
+
+### Why it occurred
+Diagnosed by matching the exact minified production bundle hash from the pasted console stack trace to a local `npm run build` (identical hash confirms identical source), then resolving the minified stack trace lines back to real source locations using the build's own `.js.map` file. Worth reusing this technique any time a user pastes a minified browser error — there's no direct browser/DevTools access in this environment otherwise.
+
+### Flow impact
+Booking creation/editing works normally again for every vehicle type. No data was affected — this was a pure render crash, nothing was ever saved incorrectly as a result.
+
+---
+
+## BUG-012 — Vendor Payouts statement table hides a row and overlaps on scroll
+
+**Status:** Fixed
+**Found:** 2026-08-31
+**File:** `src/pages/VendorPayouts.js`
+
+### What happened
+The statement table appeared to be missing a vendor's first vehicle row (only the subtotal row showed), and the header visibly overlapped table content when scrolling.
+
+### Root cause
+The table reused the `.desktop-table` CSS class's sticky-header rules (`src/index.css`), which are built specifically for `BookingSheet.js`'s two-row `<thead>` — a `:first-child` row sticky at `top:0` and a `:last-child` row sticky at `top:40px`. `VendorPayouts.js`'s table has only one header row, so both selectors matched the same `<tr>`, and the later rule (`top:40px`) won — pushing the single header down 40px and visually covering whatever row sat directly beneath it.
+
+### Fix
+Restructured into one bordered card per vendor (name + Owner/BJ Earn subtotal in the card header, a small `overflowX:auto` table of that vendor's vehicles underneath) instead of one flat table with interleaved subtotal rows. No sticky header needed at all with this shape.
+
+### Why it occurred
+`.desktop-table`'s sticky-header CSS is not a generic "nice scrollable table" utility — it's coupled to one specific page's header shape. Any new page needing a scrollable table with a single header row should use plain `overflowX:auto` instead (as `VehicleMaster.js` already did, and `VendorPayouts.js` now does) — this is now called out directly in `CLAUDE.md`/`CLAUDE_HANDOFF.md` to prevent a repeat.
+
+### Flow impact
+Visual only — no data was ever actually missing, it was hidden under the mispositioned header. All vendor rows display correctly now.
+
+---
+
+*Last updated: 2026-11-09*
