@@ -57,6 +57,8 @@ export default function Accounts({ profile, setActivePage }) {
   const [expensesMonth, setExpensesMonth] = useState([]);
   const [incomeWindow, setIncomeWindow] = useState([]);
   const [vendorVehicles, setVendorVehicles] = useState([]);
+  const [bookingsMonth, setBookingsMonth] = useState([]);
+  const [maintenanceMonth, setMaintenanceMonth] = useState([]);
   const [bookingsWindow, setBookingsWindow] = useState([]);
   const [maintenanceWindow, setMaintenanceWindow] = useState([]);
 
@@ -85,15 +87,25 @@ export default function Accounts({ profile, setActivePage }) {
       { data: expData },
       { data: incData },
       { data: vvData },
-      { data: bkData },
-      { data: maintData },
+      { data: bkMonthData },
+      { data: maintMonthData },
+      { data: bkWindowData },
+      { data: maintWindowData },
     ] = await Promise.all([
       supabase.from('expense_categories').select('*').order('name'),
       supabase.from('expenses').select('*, expense_categories(name)').gte('expense_date', start).lte('expense_date', end),
-      supabase.from('income_records').select('*').gte('income_date', windowStart).lte('income_date', windowEnd),
+      supabase.from('income_records').select('*').gte('income_date', windowStart).lte('income_date', windowEnd).limit(10000),
       supabase.from('vendor_vehicles').select('*, vehicles(id, registration_number, vehicle_type_id, vehicle_types(name)), vendors(name)').eq('active', true),
-      supabase.from('bookings').select('vehicle_number, final_rent, booking_date, status').eq('status', 'end').gte('booking_date', windowStart).lte('booking_date', windowEnd),
-      supabase.from('maintenance_expenses').select('vehicle_id, amount, expense_date').gte('expense_date', windowStart).lte('expense_date', windowEnd),
+      // Dedicated single-month fetch for the Profit panel / Per Vehicle Earn table — these must be
+      // exact. Never reuse the wider trend-chart window for them: a 6-month window can (and does,
+      // at this business's booking volume) exceed Supabase's default 1000-row response cap, which
+      // silently truncates the result and under-counts credit for whichever months lose out.
+      supabase.from('bookings').select('vehicle_number, final_rent, booking_date, status').eq('status', 'end').gte('booking_date', start).lte('booking_date', end),
+      supabase.from('maintenance_expenses').select('vehicle_id, amount, expense_date').gte('expense_date', start).lte('expense_date', end),
+      // Wider window, trend charts only (lower stakes than the Profit figure). Explicit limit as a
+      // safety margin against the same truncation risk — raise further if booking volume grows a lot.
+      supabase.from('bookings').select('vehicle_number, final_rent, booking_date, status').eq('status', 'end').gte('booking_date', windowStart).lte('booking_date', windowEnd).limit(10000),
+      supabase.from('maintenance_expenses').select('vehicle_id, amount, expense_date').gte('expense_date', windowStart).lte('expense_date', windowEnd).limit(10000),
     ]);
 
     if (catErr) setError('Failed to load accounts data: ' + catErr.message);
@@ -101,8 +113,10 @@ export default function Accounts({ profile, setActivePage }) {
     setExpensesMonth(expData || []);
     setIncomeWindow(incData || []);
     setVendorVehicles((vvData || []).filter(vv => vv.vehicles));
-    setBookingsWindow(bkData || []);
-    setMaintenanceWindow(maintData || []);
+    setBookingsMonth(bkMonthData || []);
+    setMaintenanceMonth(maintMonthData || []);
+    setBookingsWindow(bkWindowData || []);
+    setMaintenanceWindow(maintWindowData || []);
     setLoading(false);
   }
 
@@ -110,10 +124,10 @@ export default function Accounts({ profile, setActivePage }) {
   const { start: monthStart, end: monthEnd } = monthRange(month);
 
   // ── Per-vehicle BJ Earn for the selected month (profit panel + item 5) ──
-  const bookingsThisMonth = bookingsWindow.filter(b => b.booking_date >= monthStart && b.booking_date <= monthEnd);
-  const maintenanceThisMonth = maintenanceWindow.filter(m => m.expense_date >= monthStart && m.expense_date <= monthEnd);
-  const creditByRegThisMonth = buildCreditByReg(bookingsThisMonth);
-  const maintenanceByVehicleIdThisMonth = buildMaintenanceByVehicleId(maintenanceThisMonth);
+  // Uses the dedicated single-month fetch (bookingsMonth/maintenanceMonth), not the wider
+  // trend-chart window — see the loadAll() comment for why.
+  const creditByRegThisMonth = buildCreditByReg(bookingsMonth);
+  const maintenanceByVehicleIdThisMonth = buildMaintenanceByVehicleId(maintenanceMonth);
   const perVehicleRows = vendorVehicles.map(vv => ({
     vv,
     calc: computeVendorRow(vv, creditByRegThisMonth, maintenanceByVehicleIdThisMonth),
