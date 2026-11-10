@@ -284,7 +284,7 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 ---
 
 ## CI Build Check
-`.github/workflows/build.yml` runs `npm ci && npm run build` on every push to `main` and every PR into it — catches a broken build (Vercel treats ESLint warnings as build errors) automatically, independent of who's pushing.
+`.github/workflows/build.yml` runs `npm ci && npm run build` on every push to `main` and every PR into it — catches a broken build (Vercel treats ESLint warnings as build errors) automatically, independent of who's pushing. Pinned to `node-version: 24` (not 20 — 20's bundled npm failed `npm ci` against the committed lock file despite the lock file being genuinely valid; every run failed from the workflow's first commit until this was caught and fixed, 2026-11-10). **After adding or changing this workflow, verify the actual run result with `gh run watch` — don't assume it passed.**
 
 ## Development Approach
 - Requirements first, then build — step by step, one feature at a time
