@@ -391,4 +391,27 @@ Profit, BJ Earn, and Per Vehicle Earn are now accurate for every month regardles
 
 ---
 
-*Last updated: 2026-11-10*
+## BUG-014 — Profit Summary silently dropped GST and Parking charges collected
+
+**Status:** Fixed
+**Found:** 2026-11-17
+**File:** `src/pages/Accounts.js`
+
+### What happened
+Owner flagged that Parking charges and the 6% GST on Credit belong entirely to Banjara Ride's own accounts — they're never shared with the vendor — and asked whether the Profit Summary actually accounted for that money.
+
+### Root cause
+`computeVendorRow()` (`src/utils/vendorRevenue.js`) subtracts GST and the vehicle's `parking_charge` from Credit *before* splitting the remainder by `owner_share_pct` into Owner Amt / BJ Earn. That correctly keeps the vendor from getting any share of either amount, but it also meant neither amount was ever added back into anything — `profit` was computed as `bjEarnSum + subsidySumThisMonth + otherSumThisMonth − expensesSum`, which only reflects the post-split company share (BJ Earn) and silently excludes the GST and Parking money collected, even though that cash sits in Banjara Ride's own accounts.
+
+### Fix
+Added `gstSum`/`parkingSum` — each a sum of `calc.gst`/`calc.parking` across `perVehicleRows` for the selected month — and included both in `profit`. Also surfaced them as their own cards ("GST Collected", "Parking Collected") in the Profit Summary panel (grew from 4 cards/`br-grid-4` to 6/`br-grid-3`) rather than folding them invisibly into the BJ Earn figure.
+
+### Why it occurred
+The GST/Parking deduction step was written correctly for the Owner/Vendor split (Phase 15) but the Profit formula (Phase 16) was written assuming BJ Earn alone represented "the company's share" of the vehicle's revenue — missing that GST and Parking are also fully the company's money, just accounted for outside the split rather than inside it.
+
+### Flow impact
+Profit on the Accounts page now includes GST and Parking collected across all vendor-attached vehicles for the selected month, in addition to BJ Earn, Subsidy, and Other Income. `VendorPayouts.js`'s own per-vehicle statement is unchanged — it already showed GST and Parking as line items per vehicle; this fix only changes how the company-wide Profit *total* on the Accounts page is built.
+
+---
+
+*Last updated: 2026-11-17*

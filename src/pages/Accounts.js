@@ -139,9 +139,15 @@ export default function Accounts({ profile, setActivePage }) {
   const otherSumThisMonth = incomeThisMonth.filter(i => i.income_type === 'other').reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
 
   // ── Profit summary ──
+  // GST and Parking Charge are subtracted from Credit before the owner_share_pct split (see
+  // computeVendorRow), so the vendor never sees a share of them — but that money doesn't leave
+  // the business either, it's kept entirely in Banjara Ride's own accounts. BJ Earn alone (the
+  // post-split company share) would silently drop it from Profit, so it's added back here.
   const bjEarnSum = perVehicleRows.reduce((s, r) => s + r.calc.bjEarn, 0);
+  const gstSum = perVehicleRows.reduce((s, r) => s + r.calc.gst, 0);
+  const parkingSum = perVehicleRows.reduce((s, r) => s + r.calc.parking, 0);
   const expensesSum = expensesMonth.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-  const profit = bjEarnSum + subsidySumThisMonth + otherSumThisMonth - expensesSum;
+  const profit = bjEarnSum + gstSum + parkingSum + subsidySumThisMonth + otherSumThisMonth - expensesSum;
 
   // ── Item 1: maintenance per month (trend) ──
   const maintenanceTrend = months.map(mo => ({
@@ -321,8 +327,10 @@ export default function Accounts({ profile, setActivePage }) {
       {/* PROFIT SUMMARY */}
       <div className="br-form-card">
         <h2 style={{ marginBottom: '16px', color: '#1a56a0', fontSize: '18px' }}>Profit Summary — {month}</h2>
-        <div className="br-grid-4">
+        <div className="br-grid-3">
           <SummaryCard label="BJ Earn" value={formatINR(bjEarnSum)} prefix="₹" />
+          <SummaryCard label="GST Collected" value={formatINR(gstSum)} prefix="₹" />
+          <SummaryCard label="Parking Collected" value={formatINR(parkingSum)} prefix="₹" />
           <SummaryCard label="Govt Subsidy" value={formatINR(subsidySumThisMonth)} prefix="₹" />
           <SummaryCard label="Other Income" value={formatINR(otherSumThisMonth)} prefix="₹" />
           <SummaryCard label="Total Expenses" value={formatINR(expensesSum)} prefix="₹" />
